@@ -14,6 +14,7 @@ function _update()
 -- if (btn(1)) then p1.x=p1.x+1 end
 -- if (btn(2)) then p1.y=p1.y-1 end
 -- if (btn(3)) then p1.y=p1.y+1 end
+ p1update()
 end
 
 function _draw()
@@ -34,52 +35,98 @@ function istilesolid(x,y) return fget(mget(x,y),0) end
 function istilesolidpx(x,y) return istilesolid(pixeltotile(x),pixeltotile(y)) end
 -->8
 p1={}
+friction=0.1
+gravity=0.5
 
 function p1init()
  p1.x = 10
  p1.y = 20
- p1.sp= 1
- p1.tx=p1.x
- p1.ty=p1.y
+ p1.ax=0
+ p1.ay=0
+ p1.speeds=0.25 --speed slow
+ p1.speedf=2.0 --speed fast
+ p1.speedj=2.5 --speed jump
 end
 
 function p1move(x,y,fast)
- local i
+ 
+ -- TODO
+ -- Change of direction is too slow, caused by friction setting to 0.
+ -- need to set a "moving" flag so that contains the state of left/right buttons
+ -- if "moving" is set then we don't round down to 0 
  if (x > 0) then
-  i=p1.x
-  while (p1.x < i+p1.sp) do
-   if (istilesolidpx(p1.x+8,p1.y)) or (istilesolidpx(p1.x+8,p1.y+7)) then
-    break
-   end
-   p1.x=p1.x+p1.sp
-  end
+  p1.ax+=p1.speeds
  elseif (x < 0) then
-  i=p1.x
-  while (p1.x > i-p1.sp) do
-   if (istilesolidpx(p1.x-1,p1.y)) or (istilesolidpx(p1.x-1,p1.y+7)) then
-    break
-   end
-   p1.x=p1.x-p1.sp
-  end
+  p1.ax-=p1.speeds
  end
  
- if (y > 0) then
-  i=p1.y
-  while (p1.y < i+p1.sp) do
-   if (istilesolidpx(p1.x,p1.y+8)) or (istilesolidpx(p1.x+7,p1.y+8)) then
+ -- TODO
+ -- only jump if touching ground
+ -- need to immediately set ay to a set value
+ -- need to set a "jumping" flag that indicates the user is still holding the button
+ -- also need a flag that tells us whether we were standing on a solid brick on the last frame.
+ -- this tells us whether we can jump this frame or not.
+ -- if the button is held for up to 1/3rd second then we get ay at this value
+ -- then we start decaying it. after this point we won't jump again until the player touches the ground
+ if (y < 0) then
+  p1.ay-=p1.speedj
+ end
+end
+
+function p1updatefriction()
+ if (p1.ax>0) then p1.ax-=friction end
+ if (p1.ax<0) then p1.ax+=friction end
+ if(abs(p1.ax)<friction) then p1.ax=0 end
+end
+
+function p1updategravity()
+ if(p1.ay<10) then p1.ay+=gravity end
+end
+
+function p1update()
+ local i
+ if (p1.ax > 0) then
+  i=p1.x
+  while (p1.x < flr(i+p1.ax)) do
+   if (istilesolidpx(p1.x+8,p1.y)) or (istilesolidpx(p1.x+8,p1.y+7)) then
+    p1.ax=0
     break
    end
-   p1.y=p1.y+p1.sp
+   p1.x=p1.x+1
   end
- elseif (y < 0) then
-  i=p1.y
-  while (p1.y > i-p1.sp) do
-   if (istilesolidpx(p1.x,p1.y-1)) or (istilesolidpx(p1.x+7,p1.y-1)) then
+ elseif (p1.ax < 0) then
+  i=p1.x
+  while (p1.x > flr(i-abs(p1.ax))) do
+   if (istilesolidpx(p1.x-1,p1.y)) or (istilesolidpx(p1.x-1,p1.y+7)) then
+    p1.ax=0
     break
    end
-   p1.y=p1.y-p1.sp
+   p1.x=p1.x-1
   end
  end
+
+ if (p1.ay > 0) then
+  i=p1.y
+  while (p1.y < flr(i+p1.ay)) do
+   if (istilesolidpx(p1.x,p1.y+8)) or (istilesolidpx(p1.x+7,p1.y+8)) then
+    p1.ay=0
+    break
+   end
+   p1.y=p1.y+1
+  end
+ elseif (p1.ay < 0) then
+  i=p1.y
+  while (p1.y > flr(i-abs(p1.ay))) do
+   if (istilesolidpx(p1.x,p1.y-1)) or (istilesolidpx(p1.x+7,p1.y-1)) then
+    p1.ay=0
+    break
+   end
+   p1.y=p1.y-1
+  end
+ end
+
+ p1updatefriction()
+ p1updategravity()
 end
 __gfx__
 00000000009999000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018881888
