@@ -4,17 +4,18 @@ __lua__
 function _init()
 	p1init()
 end
-
+updater=4
 function _update()
- if (btn(0)) then p1move(-1,0) end
- if (btn(1)) then p1move(1,0) end
- if (btn(2)) then p1move(0,-1) end
- if (btn(3)) then p1move(0,1) end
--- if (btn(0)) then p1.x=p1.x-1 end
--- if (btn(1)) then p1.x=p1.x+1 end
--- if (btn(2)) then p1.y=p1.y-1 end
--- if (btn(3)) then p1.y=p1.y+1 end
+ updater+=1
+ if (updater == 5) then
+ if (btn(0)) then p1move(-1) end
+ if (btn(1)) then p1move(1) end
+ if (btn(5)) then p1jump() end
+ --if (btn(3)) then p1move() end
+
  p1update()
+ updater = 4
+ end
 end
 
 function _draw()
@@ -26,7 +27,8 @@ end
 
 function debug()
  print("p1.x "..p1.x.." "..tostr(istilesolid(pixeltotile(p1.x),pixeltotile(p1.y))), 0, 0, 10)
- print("p1.y "..p1.y, 0, 6, 10)
+ print("p1.ax "..p1.ax, 0, 6, 10)
+ print("p1.y "..p1.y.." "..tostr(p1.jumping), 0, 12, 10)
 end
 
 function pixeltotile(px) return flr(px / 8) end
@@ -35,52 +37,97 @@ function istilesolid(x,y) return fget(mget(x,y),0) end
 function istilesolidpx(x,y) return istilesolid(pixeltotile(x),pixeltotile(y)) end
 -->8
 p1={}
-friction=0.1
+friction=0.5
 gravity=0.5
+pminspeed=1
+pmaxspeed=4
+jumptimemax=3
 
 function p1init()
- p1.x = 10
- p1.y = 20
+ p1.x = 60
+ p1.y = 110
  p1.ax=0
  p1.ay=0
  p1.speeds=0.25 --speed slow
  p1.speedf=2.0 --speed fast
- p1.speedj=2.5 --speed jump
+ p1.speedj=1.0 --speed jump
+ p1.b_left=false
+ p1.b_right=false
+ p1.b_up=false
+ p1.b_down=false
+ p1.moving=false -- true if player moving left/right
+ p1.grounded=false -- true if player is on a walkable surface
+ p1.jumping=false -- true if player has jumped and is still holding the button
+ p1.jumpallowed=false -- Stops the player from jumping multiple times if the jump button is held down
+ p1.jumptime=0 -- counter for allowing the jump height to be increased over multiple frames
 end
 
-function p1move(x,y,fast)
- 
- -- TODO
- -- Change of direction is too slow, caused by friction setting to 0.
- -- need to set a "moving" flag so that contains the state of left/right buttons
- -- if "moving" is set then we don't round down to 0 
- if (x > 0) then
-  p1.ax+=p1.speeds
- elseif (x < 0) then
-  p1.ax-=p1.speeds
- end
- 
- -- TODO
- -- only jump if touching ground
- -- need to immediately set ay to a set value
- -- need to set a "jumping" flag that indicates the user is still holding the button
- -- also need a flag that tells us whether we were standing on a solid brick on the last frame.
- -- this tells us whether we can jump this frame or not.
- -- if the button is held for up to 1/3rd second then we get ay at this value
- -- then we start decaying it. after this point we won't jump again until the player touches the ground
- if (y < 0) then
-  p1.ay-=p1.speedj
- end
+function p1move(x,fast)
+  if (x > 0) then p1.b_right=true
+  elseif (x < 0) then p1.b_left=true end
+end
+
+function p1jump()
+ p1.b_up=true
 end
 
 function p1updatefriction()
- if (p1.ax>0) then p1.ax-=friction end
- if (p1.ax<0) then p1.ax+=friction end
- if(abs(p1.ax)<friction) then p1.ax=0 end
+  local speedtouse = p1.speeds
+  if (not p1.grounded) then speedtouse/=2 end
+
+  if (p1.b_right) then
+    if (p1.ax > 0) then 
+      p1.ax+=speedtouse
+    else
+      p1.ax+=speedtouse*2
+    end
+    p1.moving=true
+    if (p1.ax > 0) and (p1.ax < pminspeed) then p1.ax=pminspeed end
+    if (p1.ax > pmaxspeed) then p1.ax=pmaxspeed end
+  elseif (p1.b_left) then
+    if (p1.ax < 0) then 
+      p1.ax-=speedtouse
+    else
+      p1.ax-=speedtouse*2
+    end
+    p1.moving=true
+    if (p1.ax < 0) and (p1.ax > -pminspeed) then p1.ax=-pminspeed end
+    if (p1.ax < -pmaxspeed) then p1.ax=-pmaxspeed end
+  end
+
+  if (p1.grounded and not p1.moving) then
+    if (p1.ax>0) then p1.ax-=friction end
+    if (p1.ax<0) then p1.ax+=friction end
+    if(abs(p1.ax)<friction) then p1.ax=0 end
+  end
+  p1.b_right=false
+  p1.b_left=false
+  p1.moving = false
 end
 
 function p1updategravity()
- if(p1.ay<10) then p1.ay+=gravity end
+  if (p1.b_up and (p1.grounded or p1.jumping) and (p1.jumptime < jumptimemax) and (p1.jumpallowed)) then
+    p1.jumping=true
+    p1.jumptime+=1
+    p1.grounded=false
+    if (p1.ay == 0) then p1.ay-=p1.speedj*2
+    else p1.ay-=p1.speedj end
+  else
+    p1.jumping=false
+    p1.jumptime=0
+    if (p1.grounded) then
+      p1.ay=0
+      if (p1.b_up) then
+        p1.jumpallowed=false
+      else
+        p1.jumpallowed=true
+      end
+    else
+      if(p1.ay<10) then p1.ay+=gravity end
+      p1.jumpallowed=false
+    end
+  end
+  p1.b_up=false
 end
 
 function p1update()
@@ -104,12 +151,19 @@ function p1update()
    p1.x=p1.x-1
   end
  end
+  -- Check to see if the player is standing on a tile
+  if (istilesolidpx(p1.x,p1.y+8)) or (istilesolidpx(p1.x+7,p1.y+8)) then
+    p1.grounded=true
+  else
+    p1.grounded=false
+  end
 
  if (p1.ay > 0) then
   i=p1.y
   while (p1.y < flr(i+p1.ay)) do
    if (istilesolidpx(p1.x,p1.y+8)) or (istilesolidpx(p1.x+7,p1.y+8)) then
     p1.ay=0
+    p1.grounded=true
     break
    end
    p1.y=p1.y+1
@@ -152,8 +206,8 @@ __map__
 0f00000000000000000000000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f00000000000000000f00000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f000000000000000f0000000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0f000f0f0f0f0f00000f0f0f0f0f000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f00000000000000000000000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0f000f0f00000f0f00000f0f000f000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f00000000000000000000000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f0000000e0000000000000e0e00000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
