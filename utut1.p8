@@ -1,11 +1,15 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
+-- todo: work out why he's not falling/jumping between tiles on right
+-- todo: get pixel perfect detection working
+-- todo: get rounding working properly with player movement.
+--  ie: if the max speed is set to 0.5, he runs faster left than right because it rounds down.
 function _init()
 	p1init()
 end
 updater=4
-function _update()
+function _update60()
  updater+=1
  if (updater == 5) then
  if (btn(0)) then p1move(-1) end
@@ -37,20 +41,20 @@ function istilesolid(x,y) return fget(mget(x,y),0) end
 function istilesolidpx(x,y) return istilesolid(pixeltotile(x),pixeltotile(y)) end
 -->8
 p1={}
-friction=0.5
-gravity=0.5
-pminspeed=1
-pmaxspeed=4
-jumptimemax=3
+friction=0.75
+gravity=0.25
+pminspeed=1.0
+pmaxspeed=1.0
+jumptimemax=6
 
 function p1init()
  p1.x = 60
  p1.y = 110
  p1.ax=0
  p1.ay=0
- p1.speeds=0.25 --speed slow
- p1.speedf=2.0 --speed fast
- p1.speedj=1.0 --speed jump
+ p1.speeds=0.1 --speed slow
+ p1.speedf=1.0 --speed fast
+ p1.speedj=0.35 --speed jump
  p1.b_left=false
  p1.b_right=false
  p1.b_up=false
@@ -73,7 +77,7 @@ end
 
 function p1updatefriction()
   local speedtouse = p1.speeds
-  if (not p1.grounded) then speedtouse/=2 end
+  if (not p1.grounded) then speedtouse/=3 end
 
   if (p1.b_right) then
     if (p1.ax > 0) then 
