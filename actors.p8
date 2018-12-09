@@ -1,115 +1,149 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
-actors={}
-game={}
+game=
+{
+	level=1,
+}
 
 function _init()
- game.level=1
- paddleadd(0,60,0)
- paddleadd(120,60,1)
+	actors:add(actor_base:new(50))
+	actors:add(actor_paddle:new(100,0,0))
+	actors:add(actor_paddle:new(110, 30,1))
+	actors:add(actor_ball:new(0,0))
 end
 
-function _update()
- foreach(actors,
-  function(a)
-   a.update(a)
-   if (a.remove) then del(actors,a) end
-  end
- )
+function _update60()
+	foreach(actors,
+		function(a)
+			a:update()
+			if (a.remove) then del(actors,a) end
+		end
+	)
 end
 
 function _draw()
- cls()
- drawmap()
- foreach(actors,
-  function(a)
-   a.draw(a)
-  end
- )
+	cls()
+	drawmap()
+	foreach(actors,
+		function(a)
+			a:draw()
+		end
+	)
 end
 
 function drawmap()
- if (game.level==1) then
-  map(0,0,0,0)
- end
+	if (game.level==1) then
+		map(0,0,0,0)
+	end
 end
 -->8
+actors=
+{
+	add=function(self,a)
+		add(self,a)
+	end,
+}
 
-function actoradd(x,y)
- a={}
- a.x=x
- a.y=y
- a.pw=8	-- width in pixels
- a.ph=8 -- height in pixels
- a.fx=false
- a.fy=false
- a.sprinit=0
- a.spr=a.sprinit
- a.sprmax=0
- a.sprtime=0
- a.sprtimemax=0
- a.sw=1 -- sprite width
- a.sh=1 -- sprite height
- a.update=actorupdate
- a.draw=actordraw
- a.remove=false
- add(actors,a)
- return a
+-- todo: copy the frames/animation stuff from stkit1_1
+actor_base =
+{
+	x=0,
+	y=0,
+	width=8,
+	height=8,
+	flipx=false,
+	flipy=false,
+	sprinit=0,
+	sprite=0,
+	sprmax=0,
+	sprtime=0,
+	sprtimemax=0,
+	remove=false,
+
+	new=function(self,x,y)
+		local o = setmetatable({}, self)
+		self.__index = self
+		o.x = x or 0
+		o.y = y or 0
+		return o
+	end,
+
+	init=function(self)
+		self.sprite=self.sprinit
+	end,
+
+	update=function(self)
+		self.y+=1
+		if (self.sprtime > self.sprtimemax) then
+		self.sprite+=1
+		if (self.sprite > self.sprmax) then self.sprite=self.sprinit end
+		else
+		self.sprtime+=1
+		end
+		if (self:outofbounds()) then self.remove=true end
+	end,
+	
+
+	draw=function(self)
+		spr(self.sprite,
+			self.x-(self.width/2),
+			self.y-(self.height/2),
+			self.width/8,self.height/8,
+			self.flipx,
+			self.flipy)
+	end,
+
+	outofbounds=function(self)
+		if ((self.x+self.width) < 0) then return true end
+		if ((self.x) > 127) then return true end
+		if ((self.y+self.height) < 0) then return true end
+		if ((self.y) > 127) then return true end
+	end,
+}
+
+actor_paddle = actor_base:new()
+
+function actor_paddle:new (x,y,playerno)
+	local o = actor_base:new(x,y)
+	setmetatable(o, self)
+	self.__index = self
+   
+	o.sprinit=2
+	o.sprmax=2
+	o.init(o)
+	o.player=playerno or 0
+
+	self.update=function(self)
+		if (btn(2,self.player)) then
+			self.y-=2 end
+		if (btn(3,self.player)) then
+			self.y+=2 end
+		actor_base.update(self)
+	end
+
+	return o
 end
 
-function actorupdate(a)
- if (a.sprtime > a.sprtimemax) then
-  a.spr+=1
-  if (a.spr > a.sprmax) then a.spr=a.sprinit end
- else
-  a.sprtime+=1
- end
- if (actoroutofbounds(a)) then a.remove=true end
+actor_ball = actor_base:new()
+
+function actor_ball:new (x,y)
+	local o = actor_base:new(x,y)
+	setmetatable(o, self)
+	self.__index = self
+   
+	o.sprinit=1
+	o.sprmax=1
+	o.init(o)
+
+	self.update=function(self)
+		self.x+=1
+		actor_base.update(self)
+	end
+
+	return o
 end
 
-function actordraw(a)
- spr(a.spr,a.x,a.y,a.sw,a.sh,a.fx,a.fy)
-end
-
-function actoroutofbounds(a)
- if ((a.x+a.pw) < 0) then return true end
- if ((a.x) > 127) then return true end
- if ((a.y+a.ph) < 0) then return true end
- if ((a.y) > 127) then return true end
-end
--->8
-function paddleadd(x,y,player)
- a=actoradd(x,y)
- if (player==1) then a.fx=true end
- a.sprinit=2
- a.spr=a.sprinit
- a.sprmax=2
- a.update=paddleupdate
- a.player=player
-end
-
-function paddleupdate(a)
- actorupdate(a)
- if (btn(2,a.player)) then
-  a.y-=1
- end
- if (btn(3,a.player)) then
-  a.y+=1
- end
-end
--->8
-function balladd(x,y)
- a=actoradd(x,y)
- a.sprinit=1
- a.sprmax=1
- a.update=ballupdate
-end
-
-function ballupdate(a)
- actorupdate(a)
- a.x+=1
-end
 __gfx__
 000000000aaaaa00cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000077777777
 00000000aa999aa0cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000077777777
