@@ -3,146 +3,117 @@ version 16
 __lua__
 
 -- todo: make a state machine that manages whether the game is running, a score is being displayed, or the title screen.
--- todo: add a title screen
--- todo: add a "number of rounds" editor to the title screen
--- todo: add the option to "rotate" the controller to the title screen.
---		this will allow users to hold the controller like a wiimote.
+-- todo: add a title screen with the following options:
+--			- number of rounds
+--			- control type (keyboard/controller, controller rotated)
+--				there should be an image associated with each one.
+--				rotated allows users to hold the controller like a wiimote.
+--				each player should have a separate setting. This also allows each player to work out which controller they are holding.
 -- todo: add sound effects
-
-
-game=
-{
-	round = 0,
-	roundsmax = 3,
-	flag = nil,
-	players = {},
-	framerate = 60,
-	roundtime = 20, -- seconds in each round
-	scoretimer = 0,
-	roundcomplete = false,
-}
-
-function roundreset()
-	game.roundcomplete = false
-	game.flag:roundreset()
-	foreach(game.players,
-		function(p)
-			p:roundreset()
-		end
-	)
-	game.round += 1
-end
+-- todo: rename/name as "manic ctf"
+-- todo: consider pushing into the "incomplete" part of the forum.
+-- todo: add animations to the flag
+-- todo: add ability to knock over the opposing player.
+--			if neither player has the flag then they both fall over.
+--			if one player has the flag then that player falls over and drops it.
+-- todo: add a "round 1..... start" message at the beginning of each round.
+-- todo: randomise the corner that each player starts in, so they don't just start marching straight toward the flag.
+-- todo: when game is over it should display the message for a few seconds, then tell the user to press x to return to the main screen.
+-- todo: perhaps the title screen could be a flapping flag displaying "manic ctf".
+--			The menu then shows the same flag, with player 1 running on and grabbing it and running off screen.
+--			Both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
 
 function _init()
-	game.flag = actor_flag:new(7,8)
-	add(game.players, actor_player:new(1,2,0))
-	add(game.players, actor_player:new(13,14,1))
-	actors:add(game.flag)
-	actors:add(game.players[1])
-	actors:add(game.players[2])
-	roundreset()
 end
 
 function _update60()
-	if (game.roundcomplete) then
-		updatescoretimer()
-	else
-		if hasroundfinished() then
-			game.scoretimer = 3 * game.framerate
-			game.roundcomplete = true
-		else
-			foreach(actors,
-				function(a)
-					a:update()
-					if (a.remove) then del(actors,a) end
-				end
-			)
-		end
-	end
-end
-
-function hasroundfinished()
-	local i = 1
-	local result = false
-	while i <= count(game.players) do
-		if (game.players[i].won) then
-			result = true
-			break
-		end
-		i += 1
-	end
-	return result
-end
-
-function gamehasfinished()
-	local i = 1
-	local result = false
-	while i <= count(game.players) do
-		if game.players[i].roundwins == game.roundsmax then
-			result = true
-			break
-		end
-		i += 1
-	end
-	return result
-end
-
-function updatescoretimer()
-	if game.scoretimer > 0 then
-		game.scoretimer -= 1
-	elseif not gamehasfinished() then
-		roundreset()
-	end
+	game_state:update()
 end
 
 function _draw()
-	cls()
-	drawmap()
-	foreach(actors,
-		function(a)
-			a:draw()
-		end
-	)
-	drawscore()
-	if game.roundcomplete then
-		drawplayerwon()
-	end
+	game_state:draw()
 end
 
-function drawmap()
-	map(0,0,0,8)
-end
+game_state =
+{
+	curstate="initial",
+	changed=true,
 
-function drawscore()
-	print("p1: "..flr((game.players[1].wintimer+(game.framerate-1))/game.framerate),5,0,10)
-	print("round "..game.round,50,0,11)
-	print("p2: "..flr((game.players[2].wintimer+(game.framerate-1))/game.framerate),93,0,10)
-end
+	states=
+	{
+		["initial"]=
+		{
+			init=function()
+				titlescreen:init()
+			end,
+			update=function()
+				titlescreen:update()
+			end,
+			draw=function()
+				titlescreen:draw()
+			end,
+		},
+		["game"]=
+		{
+			init=function()
+				game:init()
+			end,
+			update=function()
+				game:update()
+			end,
+			draw=function()
+				game:draw()
+			end,
+		},
+	},
+	
+	set_state=function(self,state)
+		self.curstate=state
+		self.changed=true
+	end,
 
-function drawplayerwon()
-	foreach(game.players,
-		function(p)
-			if p.won then
-				if gamehasfinished() then
-					print("player " ..(p.player+1).. " won the game!!",14,61,1)
-				else
-					print("player " ..(p.player+1).. " won the round!!",14,61,1)
-				end
+	init=function(self)
+		self.states[self.curstate].init(self)
+	end,
+
+	update=function(self)
+		repeat
+			if self.changed then
+				self.changed=false
+				self.init(self)
 			end
-		end
-	)
-end
+			self.states[self.curstate].update(self)
+		until self.changed ~= true
+	end,
 
-function sametile(a1,a2)
-	if (a1.xcell == a2.xcell) and (a1.ycell == a2.ycell) then return true
-	else return false
-	end
-end
+	draw=function(self)
+		self.states[self.curstate].draw(self)
+	end,
+}
 
 actors=
 {
+	list={},
 	add=function(self,a)
-		add(self,a)
+		add(self.list,a)
+	end,
+	clear=function(self)
+		self.list={}
+	end,
+	update=function(self)
+		foreach(self.list,
+			function(a)
+				a:update()
+				if (a.remove) then del(self.list,a) end
+			end
+		)
+	end,
+	draw=function(self)
+		foreach(self.list,
+			function(a)
+				a:draw()
+			end
+		)
 	end,
 }
 
@@ -237,6 +208,151 @@ actor_base =
 		self.curframe=1
 	end,
 }
+
+titlescreen=
+{
+	displaytime = 0,
+	displaytimemax = 60*3,
+
+	init=function(self)
+		self.displaytime = 0
+		actors:clear()
+	end,
+
+	update=function(self)
+		self.displaytime+=1
+		if self.displaytime >= self.displaytimemax then
+			game_state:set_state("game")
+		end
+	end,
+
+	draw=function(self)
+		cls()
+		print("manic ctf",14,61,10)
+	end,
+}
+
+game=
+{
+	round = 0,
+	roundsmax = 3,
+	flag = nil,
+	players = {},
+	framerate = 60,
+	roundtime = 20, -- seconds in each round
+	scoretimer = 0,
+	roundcomplete = false,
+
+	init=function(self)
+		self.flag = actor_flag:new(7,8)
+		self.players={}
+		add(self.players, actor_player:new(1,2,0))
+		add(self.players, actor_player:new(13,14,1))
+		actors:clear()
+		actors:add(self.flag)
+		actors:add(self.players[1])
+		actors:add(self.players[2])
+		self:roundreset()
+	end,
+
+	update=function(self)
+		if (self.roundcomplete) then
+			self:updatescoretimer()
+		else
+			if self:hasroundfinished() then
+				self.scoretimer = 3 * self.framerate
+				self.roundcomplete = true
+			else
+				actors:update()
+			end
+		end
+	end,
+
+	draw=function(self)
+		cls()
+		self:drawmap()
+		actors:draw()
+		self:drawscore()
+		if self.roundcomplete then
+			self:drawplayerwon()
+		end
+	end,
+
+	roundreset=function(self)
+		self.roundcomplete = false
+		self.flag:roundreset()
+		foreach(self.players,
+			function(p)
+				p:roundreset()
+			end
+		)
+		self.round += 1
+	end,
+
+	hasroundfinished=function(self)
+		local i = 1
+		local result = false
+		while i <= count(self.players) do
+			if (self.players[i].won) then
+				result = true
+				break
+			end
+			i += 1
+		end
+		return result
+	end,
+
+	gamehasfinished=function(self)
+		local i = 1
+		local result = false
+		while i <= count(self.players) do
+			if self.players[i].roundwins == self.roundsmax then
+				result = true
+				break
+			end
+			i += 1
+		end
+		return result
+	end,
+
+	updatescoretimer=function(self)
+		if self.scoretimer > 0 then
+			self.scoretimer -= 1
+		elseif not self:gamehasfinished() then
+			self:roundreset()
+		end
+	end,
+
+	drawmap=function(self)
+		map(0,0,0,8)
+	end,
+
+	drawscore=function(self)
+		print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,10)
+		print("round "..self.round,50,0,11)
+		print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,10)
+	end,
+
+	drawplayerwon=function(self)
+		foreach(self.players,
+			function(p)
+				if p.won then
+					if self:gamehasfinished() then
+						print("player " ..(p.player+1).. " won the game!!",14,61,1)
+					else
+						print("player " ..(p.player+1).. " won the round!!",14,61,1)
+					end
+				end
+			end
+		)
+	end,
+}
+
+function sametile(a1,a2)
+	if (a1.xcell == a2.xcell) and (a1.ycell == a2.ycell) then return true
+	else return false
+	end
+end
 
 actor_player = actor_base:new()
 
