@@ -2,13 +2,16 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
--- todo: make a state machine that manages whether the game is running, a score is being displayed, or the title screen.
+-- todo: Add a final winners screen which displays who won, and the state of their win calculated from the difference in times across the rounds.
+--			by a long shot
+--			by a small margin
+--			only just...
 -- todo: add a title screen with the following options:
 --			- number of rounds
 --			- control type (keyboard/controller, controller rotated)
 --				there should be an image associated with each one.
 --				rotated allows users to hold the controller like a wiimote.
---				each player should have a separate setting. This also allows each player to work out which controller they are holding.
+--				each player should have a separate setting. this also allows each player to work out which controller they are holding.
 -- todo: add sound effects
 -- todo: rename/name as "manic ctf"
 -- todo: consider pushing into the "incomplete" part of the forum.
@@ -16,12 +19,17 @@ __lua__
 -- todo: add ability to knock over the opposing player.
 --			if neither player has the flag then they both fall over.
 --			if one player has the flag then that player falls over and drops it.
--- todo: add a "round 1..... start" message at the beginning of each round.
+-- todo: add a "starting in 3...2...1" message at the beginning of each round.
+--			the players should only become visible after this, and they should appear in a little cloud so their colour is temporarily masked.
 -- todo: randomise the corner that each player starts in, so they don't just start marching straight toward the flag.
 -- todo: when game is over it should display the message for a few seconds, then tell the user to press x to return to the main screen.
--- todo: perhaps the title screen could be a flapping flag displaying "manic ctf".
---			The menu then shows the same flag, with player 1 running on and grabbing it and running off screen.
---			Both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
+-- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
+--			player 1 runs on, grabs, it and runs off screen
+--			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
+-- todo: the player should flip horizontally when walking in the opposite direction.
+--			the flag should flip with the player.
+-- todo: centre the playing field on screen.
+-- todo: setup on raspberry pi to do some playtesting with Sarah.
 
 function _init()
 end
@@ -51,6 +59,18 @@ game_state =
 			end,
 			draw=function()
 				titlescreen:draw()
+			end,
+		},
+		["menu"]=
+		{
+			init=function()
+				menu:init()
+			end,
+			update=function()
+				menu:update()
+			end,
+			draw=function()
+				menu:draw()
 			end,
 		},
 		["game"]=
@@ -127,11 +147,6 @@ actor_base =
 	height=8,
 	flipx=false,
 	flipy=false,
-	-- sprinit=0,
-	-- sprite=0,
-	-- sprmax=0,
-	-- sprtime=0,
-	-- sprtimemax=0,
 	remove=false,
 	curanim="initial",
 	curframe=1,
@@ -209,26 +224,125 @@ actor_base =
 	end,
 }
 
+function skipscreen()
+	if (btnp(4,0) or btnp(5,0) or btnp(4,0) or btnp(5,0)) then
+		return true
+	else
+		return false
+	end
+end
+
 titlescreen=
 {
-	displaytime = 0,
-	displaytimemax = 60*3,
+	x=14,
+	y=-5,
+	yspeedfast=1,
+	yspeedslow=0.25,
+	yspeed=0,
+	setpoint1=40,
+	setpoint2=80,
+	colour=1,
+	colourtimer=0,
+	colourtimermax=15,
+	displayname=false,
+	skipped=false,
 
 	init=function(self)
 		self.displaytime = 0
 		actors:clear()
+		self.yspeed=self.yspeedfast
 	end,
 
 	update=function(self)
-		self.displaytime+=1
-		if self.displaytime >= self.displaytimemax then
+		if (not self.skipped) then
+			if (skipscreen()) then
+				self.skipped=true
+				self.displayname=false
+				self.yspeed=self.yspeedfast*3
+			else
+				if (self.y >= self.setpoint2) then
+					self.yspeed=self.yspeedfast
+					self.displayname=false
+				elseif (self.y >= self.setpoint1) then
+					self.yspeed=self.yspeedslow
+					self.displayname=true
+				end
+			end
+		end
+		if (self.y>=128) then
+			--game_state:set_state("menu")
 			game_state:set_state("game")
+		end
+		self.y+=self.yspeed
+		if (self.colourtimer>=self.colourtimermax) then
+			self.colourtimer=0
+			self.colour+=1
+			if (self.colour>15) then
+				self.colour=1
+			end
+		end
+		self.colourtimer+=1
+	end,
+
+	draw=function(self)
+		cls()
+		print("manic ctf",self.x,self.y,self.colour)
+		if (self.displayname) then
+			print("by darren pearce",55,61,10)
+		end
+	end,
+}
+
+menu=
+{
+	x=20,
+	y=40,
+	spacebetween=10,
+	currentitem=1,
+	items=
+	{
+		[1]=
+		{
+			name="player 1 control",
+			value="normal",
+		},
+		[2]=
+		{
+			name="player 2 control",
+			value="normal",
+		},
+	},
+
+	init=function(self)
+		actors:clear()
+		self.currentitem=1
+	end,
+
+	update=function(self)
+		if (btnp(3,0)) then
+			self.currentitem+=1
+			if (self.currentitem>count(self.items)) then
+				self.currentitem=1
+			end
+		elseif (btnp(2,0)) then
+			self.currentitem-=1
+			if (self.currentitem<1) then
+				self.currentitem=count(self.items)
+			end
 		end
 	end,
 
 	draw=function(self)
 		cls()
-		print("manic ctf",14,61,10)
+		actors:draw()
+		
+		for i=1,count(self.items) do
+			local colour = 10
+			if (self.currentitem==i) then
+				colour=11
+			end
+			print(self.items[i].name,self.x,self.y+((i-1)*self.spacebetween),colour)
+		end
 	end,
 }
 
@@ -328,9 +442,9 @@ game=
 	end,
 
 	drawscore=function(self)
-		print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,10)
+		print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,self.players[1].colour)
 		print("round "..self.round,50,0,11)
-		print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,10)
+		print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,self.players[2].colour)
 	end,
 
 	drawplayerwon=function(self)
@@ -361,8 +475,6 @@ function actor_player:new (xcell,ycell,playerno)
 	setmetatable(o, self)
 	self.__index = self
    
-	o.sprinit=2
-	o.sprmax=2
 	o.init(o)
 	o.player=playerno or 0
 	o.roundwins = 0
@@ -371,6 +483,11 @@ function actor_player:new (xcell,ycell,playerno)
 	o.flag = false
 	o.wintimer = 0
 	o.won = false
+	o.colour = 4
+
+	if (o.player==1) then
+		o.colour=12
+	end
 	
 	self.roundreset=function(self)
 		self.flag = false
@@ -408,18 +525,18 @@ function actor_player:new (xcell,ycell,playerno)
 	end
 
 	self.draw=function(self)
-		if self.player == 1 then pal(4,12) end
+		pal(4,self.colour)
 
 		actor_base.draw(self)
 		if self.flag then
-			spr(19,
+			spr(3,
 				self.x-(self.width/2),
 				self.y-(self.height/2),
 				self.width/8,self.height/8,
 				self.flipx,
 				self.flipy)
 		end
-		if self.player == 1 then pal() end
+		pal()
 	end
 
 	self.newposition=function(self,xcell,ycell)
@@ -484,8 +601,6 @@ function actor_flag:new (xcell,ycell)
 	setmetatable(o, self)
 	self.__index = self
    
-	o.sprinit=1
-	o.sprmax=1
 	o.visible = true
 	o.init(o)
 	
@@ -503,8 +618,8 @@ function actor_flag:new (xcell,ycell)
 	{
 		["initial"]=
 		{
-			ticks=30,--how long is each frame shown.
-			frames={16,17,18},--what frames are shown.
+			ticks=15,--how long is each frame shown.
+			frames={16,17,18,19,20,21,22,23},--what frames are shown.
 		},
 	}
 
@@ -513,21 +628,21 @@ end
 
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000440000004400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700004004000040040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000004004000040040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000440000004400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000440000004400033300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700004004000040040003300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000004004000040040033300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000000440000004400000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00700700000400000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000004040000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000bb000000bb000000bb000bb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00bbbb0000bbbb0000bbbb00bbb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0bbbbb000bbbbb000bbbbb000bb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00bbbb0000bbbb0000bbbb0000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000bb000000bb000000bb0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000100000001000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+33333333333330033333003333300333330033333003333300333333033333330000000000000000000000000000000000000000000000000000000000000000
+00333333003333330033333300333333003333330333333333333333303333330000000000000000000000000000000000000000000000000000000000000000
+00003333000033330000333300033333003333330030333300003333000033330000000000000000000000000000000000000000000000000000000000000000
+00333333003333330033333300303333000033330003333300333333003333330000000000000000000000000000000000000000000000000000000000000000
+33333333333333333333333333333333333333333033333300333333033333330000000000000000000000000000000000000000000000000000000000000000
+00000001000003310000330100033001003300010330000133000001300000010000000000000000000000000000000000000000000000000000000000000000
+00000001000000010000000100000001000000010000000100000001000000010000000000000000000000000000000000000000000000000000000000000000
+00000001000000010000000100000001000000010000000100000001000000010000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
