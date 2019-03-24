@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
--- todo: Add a final winners screen which displays who won, and the state of their win calculated from the difference in times across the rounds.
+-- todo: add a final winners screen which displays who won, and the state of their win calculated from the difference in times across the rounds.
 --			by a long shot
 --			by a small margin
 --			only just...
@@ -29,7 +29,12 @@ __lua__
 -- todo: the player should flip horizontally when walking in the opposite direction.
 --			the flag should flip with the player.
 -- todo: centre the playing field on screen.
--- todo: setup on raspberry pi to do some playtesting with Sarah.
+-- todo: setup on raspberry pi to do some playtesting with sarah.
+
+-- todo:	fix random movements.
+--			they are a good idea, however they should still take into account the direction the player wishes to go.
+--			so instead of moving in any direction, the random variable should hold either: any, up, down, left, or right.
+--			then when we generate the random movement, if the player is randomly moving up, then y definitely decreases by 1, but x could be either -1, +1, or 0.
 
 function _init()
 end
@@ -42,9 +47,20 @@ function _draw()
 	game_state:draw()
 end
 
+enabledebug = true
+-- enabledebug = false
+
+function debug(str)
+	if enabledebug then
+		printh(str)
+	end
+end
+
 game_state =
 {
 	curstate="initial",
+	-- curstate="menu",
+	-- curstate="game",
 	changed=true,
 
 	states=
@@ -143,6 +159,8 @@ actor_base =
 	y=0,
 	xcell=0,
 	ycell=0,
+	xcelllast=0,
+	ycelllast=0,
 	width=8,
 	height=8,
 	flipx=false,
@@ -158,7 +176,9 @@ actor_base =
 		local o = setmetatable({}, self)
 		self.__index = self
 		o.xcell = xcell or 0
+		o.xcelllast = o.xcell
 		o.ycell = ycell or 0
+		o.ycelllast = o.ycell
 		return o
 	end,
 
@@ -270,8 +290,7 @@ titlescreen=
 			end
 		end
 		if (self.y>=128) then
-			--game_state:set_state("menu")
-			game_state:set_state("game")
+			game_state:set_state("menu")
 		end
 		self.y+=self.yspeed
 		if (self.colourtimer>=self.colourtimermax) then
@@ -295,40 +314,75 @@ titlescreen=
 
 menu=
 {
+	p1rotated=false,
+	p2rotated=false,
+	p2ai=false,
 	x=20,
 	y=40,
 	spacebetween=10,
 	currentitem=1,
 	items=
 	{
-		[1]=
 		{
-			name="player 1 control",
-			value="normal",
+			currentindex=1,
+			options=
+			{
+				"start"
+			},
+			onchanged=function(self, button)
+				if (button == 4) or (button == 5) then game_state:set_state("game") end
+			end
 		},
-		[2]=
 		{
-			name="player 2 control",
-			value="normal",
+			currentindex=1,
+			options=
+			{
+				"p1 normal controller",
+				"p1 rotated controller"
+			},
+			onchanged=function(self, button)
+				if self.getcurrentvalueindex(self) == 2 then menu.p1rotated = true else menu.p1rotated = false end
+			end
+		},
+		{
+			currentindex=1,
+			options=
+			{
+				"p2 normal controller",
+				"p2 rotated controller",
+				"p2 ai"
+			},
+			onchanged=function(self, button)
+				if self.getcurrentvalueindex(self) == 2 then menu.p1rotated = true else menu.p1rotated = false end
+				if self.getcurrentvalueindex(self) == 3 then menu.p2ai = true else menu.p2ai = false end
+				debug(menu.p2ai)
+			end
 		},
 	},
 
 	init=function(self)
 		actors:clear()
 		self.currentitem=1
+		for i=1,count(self.items) do
+			self.items[i].onchanged(self,-1)
+		end
 	end,
 
 	update=function(self)
 		if (btnp(3,0)) then
-			self.currentitem+=1
-			if (self.currentitem>count(self.items)) then
-				self.currentitem=1
-			end
+			self.changecurrentitem(self,1)
 		elseif (btnp(2,0)) then
-			self.currentitem-=1
-			if (self.currentitem<1) then
-				self.currentitem=count(self.items)
-			end
+			self.changecurrentitem(self,-1)
+		elseif (btnp(0,0)) then
+			self.changecurrentvalue(self,-1)
+			self.items[self.currentitem].onchanged(self,0)
+		elseif (btnp(1,0)) then
+			self.changecurrentvalue(self,1)
+			self.getcurrentitem(self).onchanged(self,1)
+		elseif btnp(4,0)then
+			self.getcurrentitem(self).onchanged(self,4)
+		elseif btnp(5,0) then
+			self.getcurrentitem(self).onchanged(self,5)
 		end
 	end,
 
@@ -341,7 +395,45 @@ menu=
 			if (self.currentitem==i) then
 				colour=11
 			end
-			print(self.items[i].name,self.x,self.y+((i-1)*self.spacebetween),colour)
+			print(self.items[i].options[self.items[i].currentindex],self.x,self.y+((i-1)*self.spacebetween),colour)
+		end
+	end,
+
+	getcurrentitem=function(self)
+		return self.items[self.currentitem]
+	end,
+
+	getcurrentvalueindex=function(self)
+		return self.items[self.currentitem].currentindex
+	end,
+
+	changecurrentitem=function(self, dir)
+		if dir > 0 then
+			self.currentitem+=1
+			if (self.currentitem>count(self.items)) then
+				self.currentitem=1
+			end
+		elseif dir < 0 then
+			self.currentitem-=1
+			if (self.currentitem<1) then
+				self.currentitem=count(self.items)
+			end
+		end
+	end,
+
+	changecurrentvalue=function(self, dir)
+		if (dir > 0) then
+			local currentitem = self.items[self.currentitem]
+			currentitem.currentindex+=1
+			if (currentitem.currentindex>count(currentitem.options)) then
+				currentitem.currentindex=1
+			end
+		elseif (dir < 0) then
+			local currentitem = self.items[self.currentitem]
+			currentitem.currentindex-=1
+			if (currentitem.currentindex<1) then
+				currentitem.currentindex=count(currentitem.options)
+			end
 		end
 	end,
 }
@@ -360,8 +452,8 @@ game=
 	init=function(self)
 		self.flag = actor_flag:new(7,8)
 		self.players={}
-		add(self.players, actor_player:new(1,2,0))
-		add(self.players, actor_player:new(13,14,1))
+		add(self.players, actor_player:new(1,2,1,false, menu.p1rotated))
+		add(self.players, actor_player:new(13,14,2,menu.p2ai, menu.p2rotated))
 		actors:clear()
 		actors:add(self.flag)
 		actors:add(self.players[1])
@@ -452,9 +544,9 @@ game=
 			function(p)
 				if p.won then
 					if self:gamehasfinished() then
-						print("player " ..(p.player+1).. " won the game!!",14,61,1)
+						print("player " ..(p.player).. " won the game!!",14,61,1)
 					else
-						print("player " ..(p.player+1).. " won the round!!",14,61,1)
+						print("player " ..(p.player).. " won the round!!",14,61,1)
 					end
 				end
 			end
@@ -470,13 +562,13 @@ end
 
 actor_player = actor_base:new()
 
-function actor_player:new (xcell,ycell,playerno)
+function actor_player:new (xcell,ycell,playerno,ai,rotate)
 	local o = actor_base:new(xcell,ycell)
 	setmetatable(o, self)
 	self.__index = self
    
 	o.init(o)
-	o.player=playerno or 0
+	o.player=playerno or 1
 	o.roundwins = 0
 	o.initialx = xcell
 	o.initialy = ycell
@@ -484,8 +576,12 @@ function actor_player:new (xcell,ycell,playerno)
 	o.wintimer = 0
 	o.won = false
 	o.colour = 4
+	o.ai = ai or false
+	o.reacttime = 0
+	o.reactmin = 10
+	o.rotate = rotate or false
 
-	if (o.player==1) then
+	if (o.player==2) then
 		o.colour=12
 	end
 	
@@ -495,22 +591,17 @@ function actor_player:new (xcell,ycell,playerno)
 		self.won = false
 		self.xcell = self.initialx
 		self.ycell = self.initialy
+		self.xcelllast = self.xcell
+		self.ycelllast = self.ycell
 	end
 
 	o.roundreset(o)
 
 	self.update=function(self)
-		if (btnp(0,self.player)) then
-			self.newposition(self,self.xcell-1,self.ycell)
-		end
-		if (btnp(1,self.player)) then
-			self.newposition(self,self.xcell+1,self.ycell)
-		end
-		if (btnp(2,self.player)) then
-			self.newposition(self,self.xcell,self.ycell-1)
-		end
-		if (btnp(3,self.player)) then
-			self.newposition(self,self.xcell,self.ycell+1)
+		if self.ai then
+			self.updateai(self)
+		else
+			self.updatehuman(self)
 		end
 		actor_base.update(self)
 		
@@ -521,6 +612,159 @@ function actor_player:new (xcell,ycell,playerno)
 				self.won = true
 				self.roundwins += 1
 			end
+		end
+	end
+
+	self.updatehuman=function(self)
+		local left = (self.rotate == false) and 0 or 3
+		local right = (self.rotate == false) and 1 or 2
+		local up = (self.rotate == false) and 2 or 0
+		local down = (self.rotate == false) and 3 or 1
+
+		if (btnp(left,self.player-1)) then
+			self.newposition(self,self.xcell-1,self.ycell)
+		end
+		if (btnp(right,self.player-1)) then
+			self.newposition(self,self.xcell+1,self.ycell)
+		end
+		if (btnp(up,self.player-1)) then
+			self.newposition(self,self.xcell,self.ycell-1)
+		end
+		if (btnp(down,self.player-1)) then
+			self.newposition(self,self.xcell,self.ycell+1)
+		end
+	end
+
+	self.updateai=function(self)
+		self.reacttime += 1
+		if self.reacttime < self.reactmin then
+			return
+		end
+		self.reacttime = 0
+		local target = {xcell=0,ycell=0}
+		local otherplayer
+		local targetisotherplayer = false
+		local towards = 1
+		if self.player == 1 then
+			otherplayer = game.players[2]
+		else
+			otherplayer = game.players[1]
+		end
+		-- find the target the player should try and move towards
+		if self.flag then
+			target = {xcell=otherplayer.xcell,ycell=otherplayer.ycell}
+			targetisotherplayer = true
+			towards = -1
+		else
+			if otherplayer.flag then
+				target = {xcell=otherplayer.xcell,ycell=otherplayer.ycell}
+				targetisotherplayer = true
+			else
+				target = {xcell=game.flag.xcell,ycell=game.flag.ycell}
+			end
+		end
+
+		debug("p "..tostr(self.player).." target: x:"..tostr(target.xcell)..", y:"..tostr(target.ycell)..", towards: "..tostr(towards))
+
+		-- add the small possibility of a random movement.
+		local randommove = false
+		
+		-- check if both players are in the same cell
+		if targetisotherplayer and (self.xcell == target.xcell) and (self.ycell == target.ycell) then
+			if self.flag then
+				-- if the current player has the flag the should run towards the quadrant which they are farthest from.
+				local x = 0
+				local y = 0
+				if self.xcell < 8 then
+					x = 1
+				else
+					x = -1
+				end
+				if self.ycell < 8 then
+					y = 1
+				else
+					y = -1
+				end
+				self.newposition(self,self.xcell+x,self.ycell+y)
+			else
+				-- if the current player doesn't have the flag they should move randomly.
+				randommove = true
+			end
+		else
+			if self.flag then
+				if rnd(100) > 65 then
+					randommove = true
+				end
+			else
+				if rnd(100) > 95 then
+					randommove = true
+				end
+			end
+			
+			if not randommove then
+				if abs(target.xcell-self.xcell) > abs(target.ycell-self.ycell) then
+					-- move in x direction
+					if target.xcell > self.xcell then
+						self.newposition(self,self.xcell+towards,self.ycell)
+					elseif target.xcell < self.xcell then
+						self.newposition(self,self.xcell-towards,self.ycell)
+					else
+						randommove = true
+					end
+				elseif abs(target.xcell-self.xcell) < abs(target.ycell-self.ycell) then
+					-- move in y direction
+					if target.ycell > self.ycell then
+						self.newposition(self,self.xcell,self.ycell+towards)
+					elseif target.ycell < self.ycell then
+						self.newposition(self,self.xcell,self.ycell-towards)
+					else
+						randommove = true
+					end
+				else
+					randommove = true
+				end
+			end
+		end
+		
+		if randommove then
+
+			local dirx = 0
+			local diry = 0
+
+			if self.xcell < target.xcell then
+				dirx = 1
+			elseif self.xcell > target.xcell then
+				dirx = -1
+			end
+			
+			if self.ycell < target.ycell then
+				diry = 1
+			elseif self.ycell > target.ycell then
+				diry = -1
+			end
+
+			local x = dirx
+			if x == 0 then
+				x = flr(rnd(3))-1
+			end
+
+			local y = diry
+			if y == 0 then
+				y = flr(rnd(3))-1
+			end
+
+			if y ~= 0 and x ~= 0 then
+				if (rnd(2)) == 1 then
+					y = 0
+				else
+					x = 0
+				end
+			end
+
+			-- debug("p "..tostr(self.player).." random move")
+			-- local x = flr(rnd(3))-1
+			-- local y = flr(rnd(3))-1
+			self.newposition(self,self.xcell+x,self.ycell+y)
 		end
 	end
 
@@ -543,26 +787,32 @@ function actor_player:new (xcell,ycell,playerno)
 		if (not fget(mget(xcell,ycell-1),0)) then
 		   self.xcell = xcell
 		   self.ycell = ycell
-		   
-			if self.curanim == "initial" then
-				self:set_anim("walk")
-			else
-				self:set_anim("initial")
-			end
-		end
 
-		foreach(game.players,
-			function(p)
-				if (p != self) then
-					if (sametile(self, p)) then
-						if p.flag then
-							p.flag = false
-							self.flag = true
+			if (self.xcelllast ~= self.xcell) or (self.ycelllast ~= self.ycell) then
+				if self.curanim == "initial" then
+					self:set_anim("walk")
+				else
+					self:set_anim("initial")
+				end
+
+				foreach(game.players,
+					function(p)
+						if (p != self) then
+							if (sametile(self, p)) then
+								if p.flag then
+									p.flag = false
+									self.flag = true
+									debug("player "..tostr(self.player).." stole the flag")
+								end
+							end
 						end
 					end
-				end
+				)
 			end
-		)
+
+			self.xcelllast = self.xcell
+			self.ycelllast = self.ycell
+		end
 
 
 		-- todo: if both players land on the same tile at the same time then they bounce a single tile in opposite directions.
