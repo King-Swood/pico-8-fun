@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 16
+version 29
 __lua__
 
 -- todo: add a final winners screen which displays who won, and the state of their win calculated from the difference in times across the rounds.
@@ -16,9 +16,6 @@ __lua__
 -- todo: rename/name as "manic ctf"
 -- todo: consider pushing into the "incomplete" part of the forum.
 -- todo: add animations to the flag
--- todo: add ability to knock over the opposing player.
---			if neither player has the flag then they both fall over.
---			if one player has the flag then that player falls over and drops it.
 -- todo: add a "starting in 3...2...1" message at the beginning of each round.
 --			the players should only become visible after this, and they should appear in a little cloud so their colour is temporarily masked.
 -- todo: randomise the corner that each player starts in, so they don't just start marching straight toward the flag.
@@ -35,6 +32,8 @@ __lua__
 --			they are a good idea, however they should still take into account the direction the player wishes to go.
 --			so instead of moving in any direction, the random variable should hold either: any, up, down, left, or right.
 --			then when we generate the random movement, if the player is randomly moving up, then y definitely decreases by 1, but x could be either -1, +1, or 0.
+
+-- todo: atm the flag starts the new round wherever it was when the previous round finished. Decide whether we want this, or it should reset to middle.
 
 function _init()
 end
@@ -58,9 +57,9 @@ end
 
 game_state =
 {
-	curstate="initial",
+	-- curstate="initial",
 	-- curstate="menu",
-	-- curstate="game",
+	curstate="game",
 	changed=true,
 
 	states=
@@ -116,7 +115,7 @@ game_state =
 		repeat
 			if self.changed then
 				self.changed=false
-				self.init(self)
+				self:init()
 			end
 			self.states[self.curstate].update(self)
 		until self.changed ~= true
@@ -341,7 +340,7 @@ menu=
 				"p1 rotated controller"
 			},
 			onchanged=function(self, button)
-				if self.getcurrentvalueindex(self) == 2 then menu.p1rotated = true else menu.p1rotated = false end
+				if self:getcurrentvalueindex() == 2 then menu.p1rotated = true else menu.p1rotated = false end
 			end
 		},
 		{
@@ -353,8 +352,8 @@ menu=
 				"p2 ai"
 			},
 			onchanged=function(self, button)
-				if self.getcurrentvalueindex(self) == 2 then menu.p1rotated = true else menu.p1rotated = false end
-				if self.getcurrentvalueindex(self) == 3 then menu.p2ai = true else menu.p2ai = false end
+				if self:getcurrentvalueindex() == 2 then menu.p1rotated = true else menu.p1rotated = false end
+				if self:getcurrentvalueindex() == 3 then menu.p2ai = true else menu.p2ai = false end
 				debug(menu.p2ai)
 			end
 		},
@@ -370,19 +369,19 @@ menu=
 
 	update=function(self)
 		if (btnp(3,0)) then
-			self.changecurrentitem(self,1)
+			self:changecurrentitem(1)
 		elseif (btnp(2,0)) then
-			self.changecurrentitem(self,-1)
+			self:changecurrentitem(-1)
 		elseif (btnp(0,0)) then
-			self.changecurrentvalue(self,-1)
+			self:changecurrentvalue(-1)
 			self.items[self.currentitem].onchanged(self,0)
 		elseif (btnp(1,0)) then
-			self.changecurrentvalue(self,1)
-			self.getcurrentitem(self).onchanged(self,1)
+			self:changecurrentvalue(1)
+			self:getcurrentitem().onchanged(self,1)
 		elseif btnp(4,0)then
-			self.getcurrentitem(self).onchanged(self,4)
+			self:getcurrentitem().onchanged(self,4)
 		elseif btnp(5,0) then
-			self.getcurrentitem(self).onchanged(self,5)
+			self:getcurrentitem().onchanged(self,5)
 		end
 	end,
 
@@ -580,6 +579,7 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 	o.reacttime = 0
 	o.reactmin = 10
 	o.rotate = rotate or false
+	o.falltimer = 0
 
 	if (o.player==2) then
 		o.colour=12
@@ -598,10 +598,21 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 	o.roundreset(o)
 
 	self.update=function(self)
+
+		if self.curanim == "fallen" then
+			self.falltimer += 1
+			if self.falltimer >= 60 then
+				self:set_anim("initial")
+			else
+				actor_base.update(self)
+				return
+			end
+		end
+
 		if self.ai then
-			self.updateai(self)
+			self:updateai()
 		else
-			self.updatehuman(self)
+			self:updatehuman()
 		end
 		actor_base.update(self)
 		
@@ -622,16 +633,16 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 		local down = (self.rotate == false) and 3 or 1
 
 		if (btnp(left,self.player-1)) then
-			self.newposition(self,self.xcell-1,self.ycell)
+			self:newposition(self.xcell-1,self.ycell)
 		end
 		if (btnp(right,self.player-1)) then
-			self.newposition(self,self.xcell+1,self.ycell)
+			self:newposition(self.xcell+1,self.ycell)
 		end
 		if (btnp(up,self.player-1)) then
-			self.newposition(self,self.xcell,self.ycell-1)
+			self:newposition(self.xcell,self.ycell-1)
 		end
 		if (btnp(down,self.player-1)) then
-			self.newposition(self,self.xcell,self.ycell+1)
+			self:newposition(self.xcell,self.ycell+1)
 		end
 	end
 
@@ -685,7 +696,7 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 				else
 					y = -1
 				end
-				self.newposition(self,self.xcell+x,self.ycell+y)
+				self:newposition(self.xcell+x,self.ycell+y)
 			else
 				-- if the current player doesn't have the flag they should move randomly.
 				randommove = true
@@ -705,18 +716,18 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 				if abs(target.xcell-self.xcell) > abs(target.ycell-self.ycell) then
 					-- move in x direction
 					if target.xcell > self.xcell then
-						self.newposition(self,self.xcell+towards,self.ycell)
+						self:newposition(self.xcell+towards,self.ycell)
 					elseif target.xcell < self.xcell then
-						self.newposition(self,self.xcell-towards,self.ycell)
+						self:newposition(self.xcell-towards,self.ycell)
 					else
 						randommove = true
 					end
 				elseif abs(target.xcell-self.xcell) < abs(target.ycell-self.ycell) then
 					-- move in y direction
 					if target.ycell > self.ycell then
-						self.newposition(self,self.xcell,self.ycell+towards)
+						self:newposition(self.xcell,self.ycell+towards)
 					elseif target.ycell < self.ycell then
-						self.newposition(self,self.xcell,self.ycell-towards)
+						self:newposition(self.xcell,self.ycell-towards)
 					else
 						randommove = true
 					end
@@ -727,10 +738,8 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 		end
 		
 		if randommove then
-
 			local dirx = 0
 			local diry = 0
-
 			if self.xcell < target.xcell then
 				dirx = 1
 			elseif self.xcell > target.xcell then
@@ -742,30 +751,36 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 			elseif self.ycell > target.ycell then
 				diry = -1
 			end
-
-			local x = dirx
-			if x == 0 then
-				x = flr(rnd(3))-1
-			end
-
-			local y = diry
-			if y == 0 then
-				y = flr(rnd(3))-1
-			end
-
-			if y ~= 0 and x ~= 0 then
-				if (rnd(2)) == 1 then
-					y = 0
-				else
-					x = 0
-				end
-			end
-
-			-- debug("p "..tostr(self.player).." random move")
-			-- local x = flr(rnd(3))-1
-			-- local y = flr(rnd(3))-1
-			self.newposition(self,self.xcell+x,self.ycell+y)
+			self:moverandom(dirx, diry)
 		end
+	end
+
+	self.moverandom=function(self, dirx, diry)
+		dirx = dirx or 0
+		diry = diry or 0
+
+		local x = dirx
+		if x == 0 then
+			x = flr(rnd(3))-1
+		end
+
+		local y = diry
+		if y == 0 then
+			y = flr(rnd(3))-1
+		end
+
+		if y ~= 0 and x ~= 0 then
+			if (rnd(2)) == 1 then
+				y = 0
+			else
+				x = 0
+			end
+		end
+
+		-- debug("p "..tostr(self.player).." random move")
+		-- local x = flr(rnd(3))-1
+		-- local y = flr(rnd(3))-1
+		self:newposition(self.xcell+x,self.ycell+y)
 	end
 
 	self.draw=function(self)
@@ -791,7 +806,7 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 			if (self.xcelllast ~= self.xcell) or (self.ycelllast ~= self.ycell) then
 				if self.curanim == "initial" then
 					self:set_anim("walk")
-				else
+				elseif self.curanim == "walk" then
 					self:set_anim("initial")
 				end
 
@@ -799,10 +814,21 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 					function(p)
 						if (p != self) then
 							if (sametile(self, p)) then
-								if p.flag then
+								p:fallrandom()
+
+								if self.flag then
+									self.flag = false
+									game.flag.xcell = self.xcell
+									game.flag.ycell = self.ycell
+									game.flag.visible = true
+									self:fallrandom()
+									debug("player "..tostr(self.player).." dropped the flag")
+								elseif p.flag then
 									p.flag = false
 									self.flag = true
 									debug("player "..tostr(self.player).." stole the flag")
+								else
+									self:fallrandom()
 								end
 							end
 						end
@@ -814,16 +840,19 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 			self.ycelllast = self.ycell
 		end
 
-
-		-- todo: if both players land on the same tile at the same time then they bounce a single tile in opposite directions.
-		-- todo: if one player was already on the tile, that player gets bumped out of the way and loses the flag if they had it.
-		-- todo: after checking this, check to see if either have landed on the flag
-
 		if (game.flag.visible) then
 			if (sametile(self, game.flag)) then
 				game.flag.visible = false
 				self.flag = true
 			end
+		end
+	end
+
+	self.fallrandom=function(self)
+		if self.curanim ~= "fallen" then
+			self:set_anim("fallen")
+			self.falltimer = 0
+			self:moverandom()
 		end
 	end
 
@@ -838,6 +867,11 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 		{
 			ticks=0,--how long is each frame shown.
 			frames={2},--what frames are shown.
+		},
+		["fallen"]=
+		{
+			ticks=0,--how long is each frame shown.
+			frames={4},--what frames are shown.
 		},
 	}
 
@@ -858,7 +892,7 @@ function actor_flag:new (xcell,ycell)
 		self.visible = true
 	end
 
-	self.roundreset(self)
+	self:roundreset()
 
 	self.update=function(self)
 		actor_base.update(self)
@@ -878,12 +912,12 @@ end
 
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000440000004400033300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700004004000040040003300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000004004000040040033300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000440000004400000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000400000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000004040000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000440000004400033300000000440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700004004000040040003300000004004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000004004000040040033300000004004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000000440000004400000100000000440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000400000004000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000004040000004000000000000004440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 33333333333330033333003333300333330033333003333300333333033333330000000000000000000000000000000000000000000000000000000000000000
 00333333003333330033333300333333003333330333333333333333303333330000000000000000000000000000000000000000000000000000000000000000
