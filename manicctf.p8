@@ -7,7 +7,6 @@ __lua__
 --			by a small margin
 --			only just...
 -- todo: add sound effects
--- todo: rename/name as "manic ctf"
 -- todo: consider pushing into the "incomplete" part of the forum.
 -- todo: add a "starting in 3...2...1" message at the beginning of each round.
 --			the players should only become visible after this, and they should appear in a little cloud so their colour is temporarily masked.
@@ -18,6 +17,9 @@ __lua__
 --			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
 -- todo: centre the playing field on screen.
 -- todo: setup on raspberry pi to do some playtesting with sarah.
+-- todo: fix bug where if the flag is dropped it momentarily appears where it last was.
+-- todo: fix bug where players might be able to randomly be moved to out-of-bounds.
+-- todo: fix bug where a player can randomly be placed on the flag and then not pick it up.
 
 -- todo:	fix random movements.
 --			they are a good idea, however they should still take into account the direction the player wishes to go.
@@ -818,9 +820,7 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 
 								if self.flag then
 									self.flag = false
-									game.flag.xcell = self.xcell
-									game.flag.ycell = self.ycell
-									game.flag.visible = true
+									game.flag:drop(self.xcell, self.ycell)
 									self:fallrandom()
 									debug("player "..tostr(self.player).." dropped the flag")
 								elseif p.flag then
@@ -829,6 +829,10 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 									debug("player "..tostr(self.player).." stole the flag")
 								else
 									self:fallrandom()
+								end
+
+								while sametile(self, p) do
+									p:moverandom()
 								end
 							end
 						end
@@ -894,8 +898,10 @@ function actor_flag:new (xcell,ycell)
 
 	self:roundreset()
 
-	self.update=function(self)
-		actor_base.update(self)
+	self.drop=function(self, xcell, ycell)
+		self.xcell = xcell
+		self.ycell = ycell
+		self.visible = true
 	end
 
 	o.anims=
