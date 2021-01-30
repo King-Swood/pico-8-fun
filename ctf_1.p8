@@ -23,8 +23,6 @@ __lua__
 -- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
 --			player 1 runs on, grabs, it and runs off screen
 --			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
--- todo: the player should flip horizontally when walking in the opposite direction.
---			the flag should flip with the player.
 -- todo: centre the playing field on screen.
 -- todo: setup on raspberry pi to do some playtesting with sarah.
 
@@ -457,6 +455,7 @@ game=
 		actors:add(self.flag)
 		actors:add(self.players[1])
 		actors:add(self.players[2])
+		self.players[2].flipx = true
 		self:roundreset()
 	end,
 
@@ -609,12 +608,20 @@ function actor_player:new (xcell,ycell,playerno,ai,rotate)
 			end
 		end
 
+		local oldx = self.xcell
+
 		if self.ai then
 			self:updateai()
 		else
 			self:updatehuman()
 		end
 		actor_base.update(self)
+
+		if self.xcell < oldx then
+			self.flipx = true
+		elseif self.xcell > oldx then
+			self.flipx = false
+		end		
 		
 		if self.flag then
 			if self.wintimer > 0 then
