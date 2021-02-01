@@ -17,7 +17,6 @@ __lua__
 --			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
 -- todo: centre the playing field on screen.
 -- todo: setup on raspberry pi to do some playtesting with sarah.
--- todo: fix bug where if the flag is dropped it momentarily appears where it last was.
 -- todo: fix bug where players might be able to randomly be moved to out-of-bounds.
 -- todo: fix bug where a player can randomly be placed on the flag and then not pick it up.
 
@@ -191,12 +190,12 @@ actor_base =
 				self.curframe=1--loop
 			end
 		end
-
-		self.x = (self.xcell * 8) + 4
-		self.y = (self.ycell * 8) + 4
 	end,
 	
 	draw=function(self)
+		self.x = (self.xcell * 8) + 4
+		self.y = (self.ycell * 8) + 4
+		
 		if self.visible then
 			local a=self.anims[self.curanim]
 			local frame=a.frames[self.curframe]
