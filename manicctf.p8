@@ -28,6 +28,7 @@ __lua__
 -- todo: atm the flag starts the new round wherever it was when the previous round finished. Decide whether we want this, or it should reset to middle.
 
 function _init()
+	game_state:init()
 end
 
 function _update60()
@@ -190,9 +191,12 @@ actor_base =
 				self.curframe=1--loop
 			end
 		end
+		self.x = (self.xcell * 8) + 4
+		self.y = (self.ycell * 8) + 4
 	end,
 	
 	draw=function(self)
+		-- repeat the setting of x and y here, just in case something was changed.
 		self.x = (self.xcell * 8) + 4
 		self.y = (self.ycell * 8) + 4
 		
