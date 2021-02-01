@@ -8,8 +8,6 @@ __lua__
 --			only just...
 -- todo: add sound effects
 -- todo: consider pushing into the "incomplete" part of the forum.
--- todo: add a "starting in 3...2...1" message at the beginning of each round.
---			the players should only become visible after this, and they should appear in a little cloud so their colour is temporarily masked.
 -- todo: randomise the corner that each player starts in, so they don't just start marching straight toward the flag.
 -- todo: when game is over it should display the message for a few seconds, then tell the user to press x to return to the main screen.
 -- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
@@ -448,6 +446,7 @@ game=
 	roundtime = 20, -- seconds in each round
 	scoretimer = 0,
 	roundcomplete = false,
+	starttimer = 0,
 
 	init=function(self)
 		self.flag = actor_flag:new(7,8)
@@ -456,8 +455,6 @@ game=
 		add(self.players, actor_player:new(13,14,2,menu.p2ai, menu.p2rotated))
 		actors:clear()
 		actors:add(self.flag)
-		actors:add(self.players[1])
-		actors:add(self.players[2])
 		self.players[2].flipx = true
 		self:roundreset()
 	end,
@@ -466,13 +463,14 @@ game=
 		if (self.roundcomplete) then
 			self:updatescoretimer()
 		else
-			if self:hasroundfinished() then
+			if self.starttimer > 0 then
+				self:updatestarttimer()
+			elseif self:hasroundfinished() then
 				self.scoretimer = 3 * self.framerate
 				self.roundcomplete = true
-			else
-				actors:update()
 			end
 		end
+		actors:update()
 	end,
 
 	draw=function(self)
@@ -482,11 +480,14 @@ game=
 		self:drawscore()
 		if self.roundcomplete then
 			self:drawplayerwon()
+		elseif self.starttimer > 0 then
+			self:drawstarttime()
 		end
 	end,
 
 	roundreset=function(self)
 		self.roundcomplete = false
+		self.starttimer = 3 * self.framerate
 		self.flag:roundreset()
 		foreach(self.players,
 			function(p)
@@ -520,6 +521,22 @@ game=
 			i += 1
 		end
 		return result
+	end,
+
+	updatestarttimer=function(self)
+		if self.starttimer > 0 then
+			self.starttimer -= 1
+			if self.starttimer == 0 then
+				actors:add(self.players[1])
+				actors:add(actor_smoke:new(self.players[1].xcell, self.players[1].ycell))
+				actors:add(self.players[2])
+				actors:add(actor_smoke:new(self.players[2].xcell, self.players[2].ycell))
+			end
+		end
+	end,
+
+	drawstarttime=function(self)
+		print("starting in "..flr((self.starttimer/self.framerate)+1).."..",28,58,1)
 	end,
 
 	updatescoretimer=function(self)
