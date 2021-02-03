@@ -8,7 +8,6 @@ __lua__
 --			only just...
 -- todo: add sound effects
 -- todo: consider pushing into the "incomplete" part of the forum.
--- todo: randomise the corner that each player starts in, so they don't just start marching straight toward the flag.
 -- todo: when game is over it should display the message for a few seconds, then tell the user to press x to return to the main screen.
 -- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
 --			player 1 runs on, grabs, it and runs off screen
@@ -438,6 +437,25 @@ menu=
 
 game=
 {
+	corners =
+	{
+		{
+			x = 1,
+			y = 2
+		},
+		{
+			x = 13,
+			y = 2
+		},
+		{
+			x = 13,
+			y = 14
+		},
+		{
+			x = 1,
+			y = 14
+		}
+	},
 	round = 0,
 	roundsmax = 3,
 	flag = nil,
@@ -451,11 +469,17 @@ game=
 	init=function(self)
 		self.flag = actor_flag:new(7,8)
 		self.players={}
-		add(self.players, actor_player:new(1,2,1,false, menu.p1rotated))
-		add(self.players, actor_player:new(13,14,2,menu.p2ai, menu.p2rotated))
+
+		local p1corner = self:randomisecorner()
+		local p2corner = self:p2corner(p1corner)
+		
+		add(self.players, actor_player:new(self.corners[p1corner].x,self.corners[p1corner].y,1,false, menu.p1rotated))
+		self.players[1].flipx = self:flipplayer(p1corner)
+		add(self.players, actor_player:new(self.corners[p2corner].x,self.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
+		self.players[2].flipx = self:flipplayer(p2corner)
+
 		actors:clear()
 		actors:add(self.flag)
-		self.players[2].flipx = true
 		self:roundreset()
 	end,
 
@@ -569,6 +593,19 @@ game=
 				end
 			end
 		)
+	end,
+
+	randomisecorner=function(self)
+		return flr(rnd(4)) + 1
+	end,
+
+	p2corner=function(self, p1corner)
+		return ((p1corner + 1) % 4) + 1
+	end,
+
+	flipplayer=function(self, corner)
+		if (corner == 2) or (corner == 3) then return true
+		else return false end
 	end,
 }
 
