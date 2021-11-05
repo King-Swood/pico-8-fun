@@ -23,6 +23,8 @@ __lua__
 --			then when we generate the random movement, if the player is randomly moving up, then y definitely decreases by 1, but x could be either -1, +1, or 0.
 
 -- todo: atm the flag starts the new round wherever it was when the previous round finished. Decide whether we want this, or it should reset to middle.
+-- todo: fix bug where after the first round finishes, the players then move 2 cells at a time instead of just one.
+-- todo: fix bug where after the first round finishes, the countdown timer appears to be running at double speed.
 
 function _init()
 	game_state:init()
