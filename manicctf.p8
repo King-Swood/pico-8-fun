@@ -156,52 +156,61 @@ function game_init()
 end
 
 function game_update()
-	flag_update(g.f)
+	flag_update(g.flag)
 end
 
 function game_draw()
 	cls()
-	draw_thing(g.f)
+	map(0,0,0,8)
+	anim_draw(g.flag)
 end
 
 function round_init()
-	g.f = flag_create(7,8)
+	g.flag = flag_create(7,8)
 end
 
 function flag_create(x, y)
 	local f={}
-	f.x=x
-	f.y=y
-	f.visible=true
-	f.s=20
-	f.f=1
+	anim_init(f,x,y)
 	f.sp={17,18,19,20,21,22,23}
-	f.t=0
 	f.stp=15
 	return f
 end
 
-function flag_drop(f, xcell, ycell)
+function flag_drop(f,xcell,ycell)
 	f.xcell = xcell
 	f.ycell = ycell
 	f.visible = true
 end
 
 function flag_update(f)
-	update_thing_spr(f)
+	anim_update(f)
 end
 
-function update_thing_spr(a)
+-- anything that requires one or more frames and is drawn in the 8*8 grid can be managed with
+-- the anim_ functions.
+function anim_init(a,x,y)
+	a.x=x
+	a.y=y
+	a.visible=true
+	a.f=1
+	a.sp={0}
+	a.t=0
+	a.stp=60
+end
+
+function anim_update(a)
 	a.t=(a.t+1)%a.stp
 	if (a.t==0) then
 	 a.f=a.f%#a.sp+1
-	 a.s=a.sp[a.f]
 	end
 end
 
-function draw_thing(a)
-	local nx,ny=a.x*8,a.y*8
-	spr(a.s,nx,ny)
+function anim_draw(a)
+	if (a.visible) then
+		local nx,ny=a.x*8,a.y*8
+		spr(a.sp[a.f],nx,ny)
+	end
 end
 
 -- game=
