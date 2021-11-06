@@ -102,6 +102,11 @@ end
 function menu_init()
 	_update60=menu_update
 	_draw=menu_draw
+
+	menu={}
+	menu.p1rotate=false
+	menu.p2rotate=false
+	menu.p2ai=false
 end
 
 function menu_update()
@@ -146,6 +151,7 @@ function game_init()
 	g.round = 0
 	g.roundsmax = 3
 	g.players = {}
+	g.playerstats={game_stats_create(),game_stats_create()}
 	g.anims={}
 	g.framerate = 60
 	g.roundtime = 20 -- seconds in each round
@@ -153,7 +159,7 @@ function game_init()
 	g.roundcomplete = false
 	g.starttimer = 0
 
-	round_init()
+	game_round_init()
 end
 
 function game_update()
@@ -164,6 +170,24 @@ function game_update()
 			if (a.remove) then del(g.anims,a) end
 		end
 	)
+
+	if (g.roundcomplete) then
+		updatescoretimer()
+	else
+		-- todo: up to here, need to decide whether to create players earlier and only start updating/drawing them here,
+		-- or only create them here once the start timer has completed.
+		if g.starttimer > 0 then
+			g:updatestarttimer()
+		elseif g:hasroundfinished() then
+			g.scoretimer = 3 * g.framerate
+			g.roundcomplete = true
+		else
+			foreach(g.players, player_update)
+			for i=1,2 do
+				game_stats_update(g.playerstats[i], g.players[i])
+			end
+		end
+	end
 end
 
 function game_draw()
@@ -171,10 +195,243 @@ function game_draw()
 	map(0,0,0,8)
 	anim_draw(g.flag)
 	foreach(g.anims, anim_draw)
+	foreach(g.players, player_draw)
+	game_draw_score()
+	if g.roundcomplete then
+		game_draw_player_won()
+	elseif g.starttimer > 0 then
+		game_draw_start_time()
+	end
 end
 
-function round_init()
+function game_draw_start_time()
+	print("starting in "..flr((self.starttimer/self.framerate)+1).."..",28,58,1)
+end,
+
+function game_draw_score(self)
+	print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,self.players[1].colour)
+	print("round "..self.round,50,0,11)
+	print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,self.players[2].colour)
+end
+
+function game_draw_player_won(self)
+	for i=1,2 do
+		if g.playerstats[i].won then
+			if game_has_finished() then
+				print("player " ..(i).. " won the game!!",14,61,1)
+			else
+				print("player " ..(i).. " won the round!!",14,61,1)
+			end
+		end
+	end
+end
+
+function game_has_finished()
+	local i = 1
+	local result = false
+	while i <= count(g.playerstats) do
+		if g.playerstats[i].roundwins == self.roundsmax then
+			result = true
+			break
+		end
+		i += 1
+	end
+	return result
+end
+
+function game_stats_create()
+	local o={}
+	o.roundwins=0
+	o.wintimer=0
+	o.won=false
+	return o
+end
+
+function game_stats_update(s, player)
+	if player.flag then
+		if s.wintimer > 0 then
+			s.wintimer -= 1
+		else
+			s.won = true
+			s.roundwins += 1
+		end
+	end
+end
+
+function game_round_init()
 	g.flag = flag_create(7,8)
+	
+	g.players={}
+	local p1corner = corner_random()
+	local p2corner = corner_p2(p1corner)
+	-- todo: if we end up doing an init every round, we need to reset the players array and part of the stats.
+	
+	add(g.players, player_create(g.corners[p1corner].x,g.corners[p1corner].y,1,false, menu.p1rotated))
+	g.players[1].flipx = flip_player(p1corner)
+	add(g.players, player_create(g.corners[p2corner].x,g.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
+	g.players[2].flipx = flip_player(p2corner)
+
+	g.roundcomplete=false
+	g.starttimer = 3 * g.framerate
+	g.round += 1
+
+	foreach(g.playerstats,function(self)
+		self.wintimer=0
+		self.won=false
+	end)
+end
+
+function player_create(x,y,playerno,ai,rotate)
+	local a={}
+	anim_init(a,x,y)
+	a.sp={1}
+	a.stp=0
+	-- a.initialx = xcell
+	-- a.initialy = ycell
+	a.flag=false
+	a.colour=4
+	a.ai=ai or false
+	a.reacttime=0
+	a.reactmin=10
+	a.rotate=rotate or false
+	a.falltimer=0
+
+
+	a.anims=
+	{
+		["initial"]=
+		{
+			ticks=0,
+			frames={1},
+		},
+		["walk"]=
+		{
+			ticks=0,
+			frames={2},
+		},
+		["fallen"]=
+		{
+			ticks=15,
+			frames={4,5},
+		},
+	}
+
+	if (a.player==2) then a.colour=12 end
+
+	return a
+end
+
+function player_update(p)
+	if p.curanim == "fallen" then
+		p.falltimer += 1
+		if p.falltimer >= 60 then
+			anim_set(p,"initial")
+		else
+			anim_update(p)
+			return
+		end
+	end
+
+	local oldx = p.xcell
+
+	if p.ai then
+		-- p:updateai()
+	else
+		player_update_human(p)
+	end
+
+	if p.xcell < oldx then
+		p.flipx = true
+	elseif p.xcell > oldx then
+		p.flipx = false
+	end
+end
+
+function player_update_human(self)
+	local left = (self.rotate == false) and 0 or 3
+	local right = (self.rotate == false) and 1 or 2
+	local up = (self.rotate == false) and 2 or 0
+	local down = (self.rotate == false) and 3 or 1
+
+	if (btnp(left,self.player-1)) then
+		player_set_position(self, self.xcell-1,self.ycell)
+	end
+	if (btnp(right,self.player-1)) then
+		player_set_position(self, self.xcell+1,self.ycell)
+	end
+	if (btnp(up,self.player-1)) then
+		player_set_position(self, self.xcell,self.ycell-1)
+	end
+	if (btnp(down,self.player-1)) then
+		player_set_position(self, self.xcell,self.ycell+1)
+	end
+end
+
+function player_draw(p)
+	pal(4,p.colour)
+
+	anim_draw(p)
+	if p.flag then
+		spr(3,
+			p.x-(p.width/2),
+			p.y-(p.height/2),
+			1,1,
+			p.flipx,
+			p.flipy)
+	end
+	pal()
+end
+
+function player_set_position(self,xcell,ycell)
+	if (not fget(mget(xcell,ycell-1),0)) then
+		self.xcell = xcell
+		self.ycell = ycell
+
+		if (self.xcelllast ~= self.xcell) or (self.ycelllast ~= self.ycell) then
+			if self.curanim == "initial" then
+				anim_set(self,"walk")
+			elseif self.curanim == "walk" then
+				anim_set(self,"initial")
+			end
+
+			foreach(game.players,
+				function(p)
+					if (p != self) then
+						if (sametile(self, p)) then
+							p:fallrandom()
+
+							if self.flag then
+								self.flag = false
+								game.flag:drop(self.xcell, self.ycell)
+								self:fallrandom()
+								debug("player "..tostr(self.player).." dropped the flag")
+							elseif p.flag then
+								p.flag = false
+								self.flag = true
+								debug("player "..tostr(self.player).." stole the flag")
+							else
+								self:fallrandom()
+							end
+
+							while sametile(self, p) do
+								p:moverandom()
+							end
+						end
+					end
+				end
+			)
+		end
+
+		self.xcelllast = self.xcell
+		self.ycelllast = self.ycell
+	end
+
+	if (game.flag.visible) then
+		if (sametile(self, game.flag)) then
+			game.flag.visible = false
+			self.flag = true
+		end
+	end
 end
 
 function flag_create(x, y)
@@ -182,7 +439,6 @@ function flag_create(x, y)
 	anim_init(f,x,y)
 	f.sp={17,18,19,20,21,22,23}
 	f.stp=15
-	f.single=true
 	return f
 end
 
@@ -201,6 +457,8 @@ end
 function anim_init(a,x,y)
 	a.x=x
 	a.y=y
+	a.flipx=false
+	a.flipy=false
 	a.visible=true
 	a.f=1
 	a.sp={0}
@@ -208,6 +466,7 @@ function anim_init(a,x,y)
 	a.stp=60
 	a.single=false
 	a.remove=false
+	a.curanim="initial"
 end
 
 function anim_update(a)
@@ -223,43 +482,35 @@ end
 function anim_draw(a)
 	if (a.visible and not a.remove) then
 		local nx,ny=a.x*8,a.y*8
-		spr(a.sp[a.f],nx,ny)
+		spr(a.sp[a.f],nx,ny,1,1,a.flipx,a.flipy)
 	end
+end
+	
+function anim_set(a,anim)
+	local temp=a.anims[anim]
+	a.stp=temp.ticks
+	a.sp=temp.frames
+	a.f=1
+	a.t=0
+	a.curanim=anim
+end
+
+function corner_random()
+	return flr(rnd(4)) + 1
+end
+
+function corner_p2(p1corner)
+	return ((p1corner + 1) % 4) + 1
+end
+
+function flip_player(corner)
+	if (corner == 2) or (corner == 3) then return true
+	else return false end
 end
 
 -- game=
 -- {
 
--- 	init=function(self)
--- 		self.flag = actor_flag:new(7,8)
--- 		self.players={}
-
--- 		local p1corner = self:randomisecorner()
--- 		local p2corner = self:p2corner(p1corner)
-		
--- 		add(self.players, actor_player:new(self.corners[p1corner].x,self.corners[p1corner].y,1,false, menu.p1rotated))
--- 		self.players[1].flipx = self:flipplayer(p1corner)
--- 		add(self.players, actor_player:new(self.corners[p2corner].x,self.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
--- 		self.players[2].flipx = self:flipplayer(p2corner)
-
--- 		actors:clear()
--- 		actors:add(self.flag)
--- 		self:roundreset()
--- 	end,
-
--- 	update=function(self)
--- 		if (self.roundcomplete) then
--- 			self:updatescoretimer()
--- 		else
--- 			if self.starttimer > 0 then
--- 				self:updatestarttimer()
--- 			elseif self:hasroundfinished() then
--- 				self.scoretimer = 3 * self.framerate
--- 				self.roundcomplete = true
--- 			end
--- 		end
--- 		actors:update()
--- 	end,
 
 -- 	draw=function(self)
 -- 		cls()
@@ -321,10 +572,6 @@ end
 -- 				actors:add(actor_smoke:new(self.players[2].xcell, self.players[2].ycell))
 -- 			end
 -- 		end
--- 	end,
-
--- 	drawstarttime=function(self)
--- 		print("starting in "..flr((self.starttimer/self.framerate)+1).."..",28,58,1)
 -- 	end,
 
 -- 	updatescoretimer=function(self)
@@ -506,51 +753,6 @@ end
 
 -- game=
 -- {
--- 	corners =
--- 	{
--- 		{
--- 			x = 1,
--- 			y = 2
--- 		},
--- 		{
--- 			x = 13,
--- 			y = 2
--- 		},
--- 		{
--- 			x = 13,
--- 			y = 14
--- 		},
--- 		{
--- 			x = 1,
--- 			y = 14
--- 		}
--- 	},
--- 	round = 0,
--- 	roundsmax = 3,
--- 	flag = nil,
--- 	players = {},
--- 	framerate = 60,
--- 	roundtime = 20, -- seconds in each round
--- 	scoretimer = 0,
--- 	roundcomplete = false,
--- 	starttimer = 0,
-
--- 	init=function(self)
--- 		self.flag = actor_flag:new(7,8)
--- 		self.players={}
-
--- 		local p1corner = self:randomisecorner()
--- 		local p2corner = self:p2corner(p1corner)
-		
--- 		add(self.players, actor_player:new(self.corners[p1corner].x,self.corners[p1corner].y,1,false, menu.p1rotated))
--- 		self.players[1].flipx = self:flipplayer(p1corner)
--- 		add(self.players, actor_player:new(self.corners[p2corner].x,self.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
--- 		self.players[2].flipx = self:flipplayer(p2corner)
-
--- 		actors:clear()
--- 		actors:add(self.flag)
--- 		self:roundreset()
--- 	end,
 
 -- 	update=function(self)
 -- 		if (self.roundcomplete) then
@@ -595,19 +797,6 @@ end
 -- 		local result = false
 -- 		while i <= count(self.players) do
 -- 			if (self.players[i].won) then
--- 				result = true
--- 				break
--- 			end
--- 			i += 1
--- 		end
--- 		return result
--- 	end,
-
--- 	gamehasfinished=function(self)
--- 		local i = 1
--- 		local result = false
--- 		while i <= count(self.players) do
--- 			if self.players[i].roundwins == self.roundsmax then
 -- 				result = true
 -- 				break
 -- 			end
@@ -662,19 +851,6 @@ end
 -- 				end
 -- 			end
 -- 		)
--- 	end,
-
--- 	randomisecorner=function(self)
--- 		return flr(rnd(4)) + 1
--- 	end,
-
--- 	p2corner=function(self, p1corner)
--- 		return ((p1corner + 1) % 4) + 1
--- 	end,
-
--- 	flipplayer=function(self, corner)
--- 		if (corner == 2) or (corner == 3) then return true
--- 		else return false end
 -- 	end,
 -- }
 
@@ -756,26 +932,6 @@ end
 -- 				self.won = true
 -- 				self.roundwins += 1
 -- 			end
--- 		end
--- 	end
-
--- 	self.updatehuman=function(self)
--- 		local left = (self.rotate == false) and 0 or 3
--- 		local right = (self.rotate == false) and 1 or 2
--- 		local up = (self.rotate == false) and 2 or 0
--- 		local down = (self.rotate == false) and 3 or 1
-
--- 		if (btnp(left,self.player-1)) then
--- 			self:newposition(self.xcell-1,self.ycell)
--- 		end
--- 		if (btnp(right,self.player-1)) then
--- 			self:newposition(self.xcell+1,self.ycell)
--- 		end
--- 		if (btnp(up,self.player-1)) then
--- 			self:newposition(self.xcell,self.ycell-1)
--- 		end
--- 		if (btnp(down,self.player-1)) then
--- 			self:newposition(self.xcell,self.ycell+1)
 -- 		end
 -- 	end
 
@@ -916,21 +1072,6 @@ end
 -- 		self:newposition(self.xcell+x,self.ycell+y)
 -- 	end
 
--- 	self.draw=function(self)
--- 		pal(4,self.colour)
-
--- 		actor_base.draw(self)
--- 		if self.flag then
--- 			spr(3,
--- 				self.x-(self.width/2),
--- 				self.y-(self.height/2),
--- 				self.width/8,self.height/8,
--- 				self.flipx,
--- 				self.flipy)
--- 		end
--- 		pal()
--- 	end
-
 -- 	self.newposition=function(self,xcell,ycell)
 -- 		if (not fget(mget(xcell,ycell-1),0)) then
 -- 		   self.xcell = xcell
@@ -990,59 +1131,6 @@ end
 -- 			self:moverandom()
 -- 		end
 -- 	end
-
--- 	o.anims=
--- 	{
--- 		["initial"]=
--- 		{
--- 			ticks=0,
--- 			frames={1},
--- 		},
--- 		["walk"]=
--- 		{
--- 			ticks=0,
--- 			frames={2},
--- 		},
--- 		["fallen"]=
--- 		{
--- 			ticks=15,
--- 			frames={4,5},
--- 		},
--- 	}
-
--- 	return o
--- end
-
--- actor_flag = actor_base:new()
-
--- function actor_flag:new (xcell,ycell)
--- 	local o = actor_base:new(xcell,ycell)
--- 	setmetatable(o, self)
--- 	self.__index = self
-   
--- 	o.visible = true
--- 	o.init(o)
-	
--- 	self.roundreset=function(self)
--- 		self.visible = true
--- 	end
-
--- 	self:roundreset()
-
--- 	self.drop=function(self, xcell, ycell)
--- 		self.xcell = xcell
--- 		self.ycell = ycell
--- 		self.visible = true
--- 	end
-
--- 	o.anims=
--- 	{
--- 		["initial"]=
--- 		{
--- 			ticks=15,--how long is each frame shown.
--- 			frames={17,18,19,20,21,22,23},--what frames are shown.
--- 		},
--- 	}
 
 -- 	return o
 -- end
