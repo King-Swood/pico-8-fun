@@ -105,89 +105,256 @@ function menu_init()
 end
 
 function menu_update()
-
+	if (btnp(4) or btnp(5)) game_init()
 end
 
 function menu_draw()
+	cls()
+	map(0,0)
+	print("manic ctf!!",22,24,9)
 
+	print("steal the flag",32,50,10)
+	print("and run!!!",40,64,10)
+
+	print("press ❎ to start!",27,100,12)
 end
 
--- function debug(str)
--- 	if enabledebug then
--- 		printh(str)
--- 	end
--- end
+function game_init()
+	_update60=game_update
+	_draw=game_draw
 
--- game_state =
+	g={}
+	g.corners =
+	{
+		{
+			x = 1,
+			y = 2
+		},
+		{
+			x = 13,
+			y = 2
+		},
+		{
+			x = 13,
+			y = 14
+		},
+		{
+			x = 1,
+			y = 14
+		}
+	}
+	g.round = 0
+	g.roundsmax = 3
+	g.players = {}
+	g.framerate = 60
+	g.roundtime = 20 -- seconds in each round
+	g.scoretimer = 0
+	g.roundcomplete = false
+	g.starttimer = 0
+
+	round_init()
+end
+
+function game_update()
+	flag_update(g.f)
+end
+
+function game_draw()
+	cls()
+	draw_thing(g.f)
+end
+
+function round_init()
+	g.f = flag_create(7,8)
+end
+
+function flag_create(x, y)
+	local f={}
+	f.x=x
+	f.y=y
+	f.visible=true
+	f.s=20
+	f.f=1
+	f.sp={17,18,19,20,21,22,23}
+	f.t=0
+	f.stp=15
+	return f
+end
+
+function flag_drop(f, xcell, ycell)
+	f.xcell = xcell
+	f.ycell = ycell
+	f.visible = true
+end
+
+function flag_update(f)
+	update_thing_spr(f)
+end
+
+function update_thing_spr(a)
+	a.t=(a.t+1)%a.stp
+	if (a.t==0) then
+	 a.f=a.f%#a.sp+1
+	 a.s=a.sp[a.f]
+	end
+end
+
+function draw_thing(a)
+	local nx,ny=a.x*8,a.y*8
+	spr(a.s,nx,ny)
+end
+
+-- game=
 -- {
--- 	-- curstate="initial",
--- 	-- curstate="menu",
--- 	curstate="game",
--- 	changed=true,
-
--- 	states=
--- 	{
--- 		["initial"]=
--- 		{
--- 			init=function()
--- 				titlescreen:init()
--- 			end,
--- 			update=function()
--- 				titlescreen:update()
--- 			end,
--- 			draw=function()
--- 				titlescreen:draw()
--- 			end,
--- 		},
--- 		["menu"]=
--- 		{
--- 			init=function()
--- 				menu:init()
--- 			end,
--- 			update=function()
--- 				menu:update()
--- 			end,
--- 			draw=function()
--- 				menu:draw()
--- 			end,
--- 		},
--- 		["game"]=
--- 		{
--- 			init=function()
--- 				game:init()
--- 			end,
--- 			update=function()
--- 				game:update()
--- 			end,
--- 			draw=function()
--- 				game:draw()
--- 			end,
--- 		},
--- 	},
-	
--- 	set_state=function(self,state)
--- 		self.curstate=state
--- 		self.changed=true
--- 	end,
 
 -- 	init=function(self)
--- 		self.states[self.curstate].init(self)
+-- 		self.flag = actor_flag:new(7,8)
+-- 		self.players={}
+
+-- 		local p1corner = self:randomisecorner()
+-- 		local p2corner = self:p2corner(p1corner)
+		
+-- 		add(self.players, actor_player:new(self.corners[p1corner].x,self.corners[p1corner].y,1,false, menu.p1rotated))
+-- 		self.players[1].flipx = self:flipplayer(p1corner)
+-- 		add(self.players, actor_player:new(self.corners[p2corner].x,self.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
+-- 		self.players[2].flipx = self:flipplayer(p2corner)
+
+-- 		actors:clear()
+-- 		actors:add(self.flag)
+-- 		self:roundreset()
 -- 	end,
 
 -- 	update=function(self)
--- 		repeat
--- 			if self.changed then
--- 				self.changed=false
--- 				self:init()
+-- 		if (self.roundcomplete) then
+-- 			self:updatescoretimer()
+-- 		else
+-- 			if self.starttimer > 0 then
+-- 				self:updatestarttimer()
+-- 			elseif self:hasroundfinished() then
+-- 				self.scoretimer = 3 * self.framerate
+-- 				self.roundcomplete = true
 -- 			end
--- 			self.states[self.curstate].update(self)
--- 		until self.changed ~= true
+-- 		end
+-- 		actors:update()
 -- 	end,
 
 -- 	draw=function(self)
--- 		self.states[self.curstate].draw(self)
+-- 		cls()
+-- 		self:drawmap()
+-- 		actors:draw()
+-- 		self:drawscore()
+-- 		if self.roundcomplete then
+-- 			self:drawplayerwon()
+-- 		elseif self.starttimer > 0 then
+-- 			self:drawstarttime()
+-- 		end
+-- 	end,
+
+-- 	roundreset=function(self)
+-- 		self.roundcomplete = false
+-- 		self.starttimer = 3 * self.framerate
+-- 		self.flag:roundreset()
+-- 		foreach(self.players,
+-- 			function(p)
+-- 				p:roundreset()
+-- 			end
+-- 		)
+-- 		self.round += 1
+-- 	end,
+
+-- 	hasroundfinished=function(self)
+-- 		local i = 1
+-- 		local result = false
+-- 		while i <= count(self.players) do
+-- 			if (self.players[i].won) then
+-- 				result = true
+-- 				break
+-- 			end
+-- 			i += 1
+-- 		end
+-- 		return result
+-- 	end,
+
+-- 	gamehasfinished=function(self)
+-- 		local i = 1
+-- 		local result = false
+-- 		while i <= count(self.players) do
+-- 			if self.players[i].roundwins == self.roundsmax then
+-- 				result = true
+-- 				break
+-- 			end
+-- 			i += 1
+-- 		end
+-- 		return result
+-- 	end,
+
+-- 	updatestarttimer=function(self)
+-- 		if self.starttimer > 0 then
+-- 			self.starttimer -= 1
+-- 			if self.starttimer == 0 then
+-- 				actors:add(self.players[1])
+-- 				actors:add(actor_smoke:new(self.players[1].xcell, self.players[1].ycell))
+-- 				actors:add(self.players[2])
+-- 				actors:add(actor_smoke:new(self.players[2].xcell, self.players[2].ycell))
+-- 			end
+-- 		end
+-- 	end,
+
+-- 	drawstarttime=function(self)
+-- 		print("starting in "..flr((self.starttimer/self.framerate)+1).."..",28,58,1)
+-- 	end,
+
+-- 	updatescoretimer=function(self)
+-- 		if self.scoretimer > 0 then
+-- 			self.scoretimer -= 1
+-- 		elseif not self:gamehasfinished() then
+-- 			self:roundreset()
+-- 		end
+-- 	end,
+
+-- 	drawmap=function(self)
+-- 		map(0,0,0,8)
+-- 	end,
+
+-- 	drawscore=function(self)
+-- 		print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,self.players[1].colour)
+-- 		print("round "..self.round,50,0,11)
+-- 		print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,self.players[2].colour)
+-- 	end,
+
+-- 	drawplayerwon=function(self)
+-- 		foreach(self.players,
+-- 			function(p)
+-- 				if p.won then
+-- 					if self:gamehasfinished() then
+-- 						print("player " ..(p.player).. " won the game!!",14,61,1)
+-- 					else
+-- 						print("player " ..(p.player).. " won the round!!",14,61,1)
+-- 					end
+-- 				end
+-- 			end
+-- 		)
+-- 	end,
+
+-- 	randomisecorner=function(self)
+-- 		return flr(rnd(4)) + 1
+-- 	end,
+
+-- 	p2corner=function(self, p1corner)
+-- 		return ((p1corner + 1) % 4) + 1
+-- 	end,
+
+-- 	flipplayer=function(self, corner)
+-- 		if (corner == 2) or (corner == 3) then return true
+-- 		else return false end
 -- 	end,
 -- }
+
+function debug(str)
+	if enabledebug then
+		printh(str)
+	end
+end
 
 -- actors=
 -- {
@@ -311,132 +478,6 @@ end
 -- 		self.animtick=a.ticks--ticks count down.
 -- 		self.curanim=anim
 -- 		self.curframe=1
--- 	end,
--- }
-
--- menu=
--- {
--- 	p1rotated=false,
--- 	p2rotated=false,
--- 	p2ai=false,
--- 	x=20,
--- 	y=40,
--- 	spacebetween=10,
--- 	currentitem=1,
--- 	items=
--- 	{
--- 		{
--- 			currentindex=1,
--- 			options=
--- 			{
--- 				"start"
--- 			},
--- 			onchanged=function(self, button)
--- 				if (button == 4) or (button == 5) then game_state:set_state("game") end
--- 			end
--- 		},
--- 		{
--- 			currentindex=1,
--- 			options=
--- 			{
--- 				"p1 normal controller",
--- 				"p1 rotated controller"
--- 			},
--- 			onchanged=function(self, button)
--- 				if self:getcurrentvalueindex() == 2 then menu.p1rotated = true else menu.p1rotated = false end
--- 			end
--- 		},
--- 		{
--- 			currentindex=1,
--- 			options=
--- 			{
--- 				"p2 normal controller",
--- 				"p2 rotated controller",
--- 				"p2 ai"
--- 			},
--- 			onchanged=function(self, button)
--- 				if self:getcurrentvalueindex() == 2 then menu.p1rotated = true else menu.p1rotated = false end
--- 				if self:getcurrentvalueindex() == 3 then menu.p2ai = true else menu.p2ai = false end
--- 				debug(menu.p2ai)
--- 			end
--- 		},
--- 	},
-
--- 	init=function(self)
--- 		actors:clear()
--- 		self.currentitem=1
--- 		for i=1,count(self.items) do
--- 			self.items[i].onchanged(self,-1)
--- 		end
--- 	end,
-
--- 	update=function(self)
--- 		if (btnp(3,0)) then
--- 			self:changecurrentitem(1)
--- 		elseif (btnp(2,0)) then
--- 			self:changecurrentitem(-1)
--- 		elseif (btnp(0,0)) then
--- 			self:changecurrentvalue(-1)
--- 			self.items[self.currentitem].onchanged(self,0)
--- 		elseif (btnp(1,0)) then
--- 			self:changecurrentvalue(1)
--- 			self:getcurrentitem().onchanged(self,1)
--- 		elseif btnp(4,0)then
--- 			self:getcurrentitem().onchanged(self,4)
--- 		elseif btnp(5,0) then
--- 			self:getcurrentitem().onchanged(self,5)
--- 		end
--- 	end,
-
--- 	draw=function(self)
--- 		cls()
--- 		actors:draw()
-		
--- 		for i=1,count(self.items) do
--- 			local colour = 10
--- 			if (self.currentitem==i) then
--- 				colour=11
--- 			end
--- 			print(self.items[i].options[self.items[i].currentindex],self.x,self.y+((i-1)*self.spacebetween),colour)
--- 		end
--- 	end,
-
--- 	getcurrentitem=function(self)
--- 		return self.items[self.currentitem]
--- 	end,
-
--- 	getcurrentvalueindex=function(self)
--- 		return self.items[self.currentitem].currentindex
--- 	end,
-
--- 	changecurrentitem=function(self, dir)
--- 		if dir > 0 then
--- 			self.currentitem+=1
--- 			if (self.currentitem>count(self.items)) then
--- 				self.currentitem=1
--- 			end
--- 		elseif dir < 0 then
--- 			self.currentitem-=1
--- 			if (self.currentitem<1) then
--- 				self.currentitem=count(self.items)
--- 			end
--- 		end
--- 	end,
-
--- 	changecurrentvalue=function(self, dir)
--- 		if (dir > 0) then
--- 			local currentitem = self.items[self.currentitem]
--- 			currentitem.currentindex+=1
--- 			if (currentitem.currentindex>count(currentitem.options)) then
--- 				currentitem.currentindex=1
--- 			end
--- 		elseif (dir < 0) then
--- 			local currentitem = self.items[self.currentitem]
--- 			currentitem.currentindex-=1
--- 			if (currentitem.currentindex<1) then
--- 				currentitem.currentindex=count(currentitem.options)
--- 			end
--- 		end
 -- 	end,
 -- }
 
