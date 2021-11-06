@@ -146,6 +146,7 @@ function game_init()
 	g.round = 0
 	g.roundsmax = 3
 	g.players = {}
+	g.anims={}
 	g.framerate = 60
 	g.roundtime = 20 -- seconds in each round
 	g.scoretimer = 0
@@ -156,13 +157,20 @@ function game_init()
 end
 
 function game_update()
-	flag_update(g.flag)
+	anim_update(g.flag)
+	foreach(g.anims,
+		function(a)
+			anim_update(a)
+			if (a.remove) then del(g.anims,a) end
+		end
+	)
 end
 
 function game_draw()
 	cls()
 	map(0,0,0,8)
 	anim_draw(g.flag)
+	foreach(g.anims, anim_draw)
 end
 
 function round_init()
@@ -174,6 +182,7 @@ function flag_create(x, y)
 	anim_init(f,x,y)
 	f.sp={17,18,19,20,21,22,23}
 	f.stp=15
+	f.single=true
 	return f
 end
 
@@ -197,17 +206,22 @@ function anim_init(a,x,y)
 	a.sp={0}
 	a.t=0
 	a.stp=60
+	a.single=false
+	a.remove=false
 end
 
 function anim_update(a)
 	a.t=(a.t+1)%a.stp
 	if (a.t==0) then
-	 a.f=a.f%#a.sp+1
+		a.f=a.f%#a.sp+1
+		if a.f==1 and a.single then
+			a.remove=true
+		end
 	end
 end
 
 function anim_draw(a)
-	if (a.visible) then
+	if (a.visible and not a.remove) then
 		local nx,ny=a.x*8,a.y*8
 		spr(a.sp[a.f],nx,ny)
 	end
