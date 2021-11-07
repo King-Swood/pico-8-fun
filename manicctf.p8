@@ -159,7 +159,7 @@ function game_init()
 	g.roundcomplete = false
 	g.starttimer = 0
 
-	game_round_init()
+	game_round_init(g)
 end
 
 function game_update()
@@ -172,7 +172,11 @@ function game_update()
 	)
 
 	if (g.roundcomplete) then
-		updatescoretimer()
+		if g.scoretimer > 0 then
+			g.scoretimer -= 1
+		elseif not game_has_finished(g) then
+			game_round_init(g)
+		end
 	else
 		if g.starttimer > 0 then
 			if game_update_start_timer(g) then
@@ -221,27 +225,14 @@ end
 
 function game_draw_player_won(self)
 	for i=1,2 do
-		if g.playerstats[i].won then
-			if game_has_finished() then
+		if self.playerstats[i].won then
+			if game_has_finished(self) then
 				print("player " ..(i).. " won the game!!",14,61,1)
 			else
 				print("player " ..(i).. " won the round!!",14,61,1)
 			end
 		end
 	end
-end
-
-function game_has_finished()
-	local i = 1
-	local result = false
-	while i <= count(g.playerstats) do
-		if g.playerstats[i].roundwins == self.roundsmax then
-			result = true
-			break
-		end
-		i += 1
-	end
-	return result
 end
 
 function game_stats_create()
@@ -263,14 +254,14 @@ function game_stats_update(s, player)
 	end
 end
 
-function game_round_init()
-	g.flag = flag_create(7,8)
-	game_create_players(g)
-	g.roundcomplete=false
-	g.starttimer = 3 * g.framerate
-	g.round += 1
+function game_round_init(self)
+	self.flag = flag_create(7,8)
+	game_create_players(self)
+	self.roundcomplete=false
+	self.starttimer = 3 * self.framerate
+	self.round += 1
 
-	foreach(g.playerstats,function(self)
+	foreach(self.playerstats,function(self)
 		self.wintimer=0
 		self.won=false
 	end)
@@ -305,6 +296,19 @@ function game_has_round_finished(self)
 	local result = false
 	while i <= count(self.players) do
 		if (self.players[i].won) then
+			result = true
+			break
+		end
+		i += 1
+	end
+	return result
+end
+
+function game_has_finished(self)
+	local i = 1
+	local result = false
+	while i <= count(self.playerstats) do
+		if self.playerstats[i].roundwins == self.roundsmax then
 			result = true
 			break
 		end
