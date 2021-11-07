@@ -179,6 +179,7 @@ function game_update()
 				foreach(g.players,
 					function(p)
 						p.visible=true
+						add(g.anims, smoke_create(p.x,p.y))
 					end
 				)
 			end
@@ -198,8 +199,8 @@ function game_draw()
 	cls()
 	map(0,0,0,8)
 	anim_draw(g.flag)
-	foreach(g.anims, anim_draw)
 	foreach(g.players, player_draw)
+	foreach(g.anims, anim_draw)
 	game_draw_score(g)
 	if g.roundcomplete then
 		game_draw_player_won(g)
@@ -482,6 +483,15 @@ end
 
 function flag_update(f)
 	anim_update(f)
+end
+
+function smoke_create(x,y)
+	local a={}
+	anim_init(a,x,y)
+	a.sp={6,7,8}
+	a.stp=15
+	a.single=true
+	return a
 end
 
 -- anything that requires one or more frames and is drawn in the 8*8 grid can be managed with
