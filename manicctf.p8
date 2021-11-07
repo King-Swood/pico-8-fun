@@ -174,11 +174,15 @@ function game_update()
 	if (g.roundcomplete) then
 		updatescoretimer()
 	else
-		-- todo: up to here, need to decide whether to create players earlier and only start updating/drawing them here,
-		-- or only create them here once the start timer has completed.
 		if g.starttimer > 0 then
-			g:updatestarttimer()
-		elseif g:hasroundfinished() then
+			if game_update_start_timer(g) then
+				foreach(g.players,
+					function(p)
+						p.visible=true
+					end
+				)
+			end
+		elseif game_has_round_finished(g) then
 			g.scoretimer = 3 * g.framerate
 			g.roundcomplete = true
 		else
@@ -196,22 +200,22 @@ function game_draw()
 	anim_draw(g.flag)
 	foreach(g.anims, anim_draw)
 	foreach(g.players, player_draw)
-	game_draw_score()
+	game_draw_score(g)
 	if g.roundcomplete then
-		game_draw_player_won()
+		game_draw_player_won(g)
 	elseif g.starttimer > 0 then
-		game_draw_start_time()
+		game_draw_start_time(g)
 	end
 end
 
-function game_draw_start_time()
+function game_draw_start_time(self)
 	print("starting in "..flr((self.starttimer/self.framerate)+1).."..",28,58,1)
-end,
+end
 
 function game_draw_score(self)
-	print("p1: "..flr((self.players[1].wintimer+(self.framerate-1))/self.framerate),5,0,self.players[1].colour)
+	print("p1: "..flr((self.playerstats[1].wintimer+(self.framerate-1))/self.framerate),5,0,self.players[1].colour)
 	print("round "..self.round,50,0,11)
-	print("p2: "..flr((self.players[2].wintimer+(self.framerate-1))/self.framerate),93,0,self.players[2].colour)
+	print("p2: "..flr((self.playerstats[2].wintimer+(self.framerate-1))/self.framerate),93,0,self.players[2].colour)
 end
 
 function game_draw_player_won(self)
@@ -260,17 +264,7 @@ end
 
 function game_round_init()
 	g.flag = flag_create(7,8)
-	
-	g.players={}
-	local p1corner = corner_random()
-	local p2corner = corner_p2(p1corner)
-	-- todo: if we end up doing an init every round, we need to reset the players array and part of the stats.
-	
-	add(g.players, player_create(g.corners[p1corner].x,g.corners[p1corner].y,1,false, menu.p1rotated))
-	g.players[1].flipx = flip_player(p1corner)
-	add(g.players, player_create(g.corners[p2corner].x,g.corners[p2corner].y,2,menu.p2ai, menu.p2rotated))
-	g.players[2].flipx = flip_player(p2corner)
-
+	game_create_players(g)
 	g.roundcomplete=false
 	g.starttimer = 3 * g.framerate
 	g.round += 1
@@ -279,6 +273,43 @@ function game_round_init()
 		self.wintimer=0
 		self.won=false
 	end)
+end
+
+function game_update_start_timer(self)
+	if self.starttimer > 0 then
+		self.starttimer -= 1
+		if self.starttimer == 0 then
+			return true
+		end
+	end
+	return false
+end
+
+function game_create_players(self)	
+	self.players={}
+	local p1corner = corner_random()
+	local p2corner = corner_p2(p1corner)
+	local p = player_create(self.corners[p1corner].x,self.corners[p1corner].y,1,false, menu.p1rotated)
+	p.visible=false
+	p.flipx = flip_player(p1corner)
+	add(self.players, p)
+	p = player_create(self.corners[p2corner].x,self.corners[p2corner].y,2,menu.p2ai, menu.p2rotated)
+	p.visible=false
+	p.flipx = flip_player(p2corner)
+	add(self.players, p)
+end
+
+function game_has_round_finished(self)
+	local i = 1
+	local result = false
+	while i <= count(self.players) do
+		if (self.players[i].won) then
+			result = true
+			break
+		end
+		i += 1
+	end
+	return result
 end
 
 function player_create(x,y,playerno,ai,rotate)
@@ -295,6 +326,7 @@ function player_create(x,y,playerno,ai,rotate)
 	a.reactmin=10
 	a.rotate=rotate or false
 	a.falltimer=0
+	a.player=playerno or 1
 
 
 	a.anims=
