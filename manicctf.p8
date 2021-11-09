@@ -8,7 +8,6 @@ __lua__
 --			only just...
 -- todo: add sound effects
 -- todo: consider pushing into the "incomplete" part of the forum.
--- todo: when game is over it should display the message for a few seconds, then tell the user to press x to return to the main screen.
 -- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
 --			player 1 runs on, grabs, it and runs off screen
 --			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
@@ -115,9 +114,9 @@ function menu_draw()
 	print("manic ctf!!",22,24,9)
 
 	print("steal the flag",32,50,10)
-	print("and run!!!",40,64,10)
+	print("crush your opponent",35,64,10)
 
-	print("press ❎ to start!",27,100,12)
+	print("press a or b to start!",20,100,12)
 end
 
 function game_init()
@@ -150,7 +149,7 @@ function game_init()
 	g.playerstats={game_stats_create(),game_stats_create()}
 	g.anims={}
 	g.framerate = 60
-	g.roundtime = 20 -- seconds in each round
+	g.roundtime = 3--20 -- seconds in each round
 	g.scoretimer = 0
 	g.roundcomplete = false
 	g.starttimer = 0
@@ -228,6 +227,9 @@ function game_draw_player_won(self)
 		if self.playerstats[i].won then
 			if game_has_finished(self) then
 				print("player " ..(i).. " won the game!!",14,61,1)
+				if g.scoretimer==0 then
+					print("press a or b to finish",20,100,12)
+				end
 			else
 				print("player " ..(i).. " won the round!!",14,61,1)
 			end
