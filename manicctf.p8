@@ -191,7 +191,7 @@ function game_update()
 			g.scoretimer = 3 * g.framerate
 			g.roundcomplete = true
 		else
-			foreach(g.players, player_update)
+			foreach(g.players,player_update)
 			for i=1,2 do
 				game_stats_update(g.playerstats[i], g.players[i])
 			end
@@ -322,8 +322,8 @@ function player_create(x,y,playerno,ai,rotate)
 	anim_init(a,x,y)
 	a.sp={1}
 	a.stp=0
-	-- a.initialx = xcell
-	-- a.initialy = ycell
+	a.xlast=-999
+	a.ylast=-999
 	a.flag=false
 	a.colour=4
 	a.ai=ai or false
@@ -369,7 +369,7 @@ function player_update(p)
 		end
 	end
 
-	local oldx = p.xcell
+	local oldx = p.x
 
 	if p.ai then
 		-- p:updateai()
@@ -377,9 +377,9 @@ function player_update(p)
 		player_update_human(p)
 	end
 
-	if p.xcell < oldx then
+	if p.x < oldx then
 		p.flipx = true
-	elseif p.xcell > oldx then
+	elseif p.x > oldx then
 		p.flipx = false
 	end
 end
@@ -391,16 +391,16 @@ function player_update_human(self)
 	local down = (self.rotate == false) and 3 or 1
 
 	if (btnp(left,self.player-1)) then
-		player_set_position(self, self.xcell-1,self.ycell)
+		player_set_position(self, self.x-1,self.y)
 	end
 	if (btnp(right,self.player-1)) then
-		player_set_position(self, self.xcell+1,self.ycell)
+		player_set_position(self, self.x+1,self.y)
 	end
 	if (btnp(up,self.player-1)) then
-		player_set_position(self, self.xcell,self.ycell-1)
+		player_set_position(self, self.x,self.y-1)
 	end
 	if (btnp(down,self.player-1)) then
-		player_set_position(self, self.xcell,self.ycell+1)
+		player_set_position(self, self.x,self.y+1)
 	end
 end
 
@@ -410,8 +410,8 @@ function player_draw(p)
 	anim_draw(p)
 	if p.flag then
 		spr(3,
-			p.x-(p.width/2),
-			p.y-(p.height/2),
+			p.x*8,
+			p.y*8,
 			1,1,
 			p.flipx,
 			p.flipy)
@@ -419,12 +419,13 @@ function player_draw(p)
 	pal()
 end
 
-function player_set_position(self,xcell,ycell)
-	if (not fget(mget(xcell,ycell-1),0)) then
-		self.xcell = xcell
-		self.ycell = ycell
+function player_set_position(self,x,y)
+	local game=g --uses global variable
+	if (not fget(mget(x,y-1),0)) then
+		self.x = x
+		self.y = y
 
-		if (self.xcelllast ~= self.xcell) or (self.ycelllast ~= self.ycell) then
+		if (self.xlast ~= self.x) or (self.ylast ~= self.y) then
 			if self.curanim == "initial" then
 				anim_set(self,"walk")
 			elseif self.curanim == "walk" then
@@ -435,23 +436,23 @@ function player_set_position(self,xcell,ycell)
 				function(p)
 					if (p != self) then
 						if (sametile(self, p)) then
-							p:fallrandom()
+							player_fall_random(p)
 
 							if self.flag then
 								self.flag = false
-								game.flag:drop(self.xcell, self.ycell)
-								self:fallrandom()
+								flag_drop(game.flag,self.x, self.y)
+								player_fall_random(self)
 								debug("player "..tostr(self.player).." dropped the flag")
 							elseif p.flag then
 								p.flag = false
 								self.flag = true
 								debug("player "..tostr(self.player).." stole the flag")
 							else
-								self:fallrandom()
+								player_fall_random(self)
 							end
 
 							while sametile(self, p) do
-								p:moverandom()
+								player_move_random(p)
 							end
 						end
 					end
@@ -459,8 +460,8 @@ function player_set_position(self,xcell,ycell)
 			)
 		end
 
-		self.xcelllast = self.xcell
-		self.ycelllast = self.ycell
+		self.xlast = self.x
+		self.ylast = self.y
 	end
 
 	if (game.flag.visible) then
@@ -471,6 +472,42 @@ function player_set_position(self,xcell,ycell)
 	end
 end
 
+function player_fall_random(self)
+	if self.curanim ~= "fallen" then
+		anim_set(self,"fallen")
+		self.falltimer = 0
+		player_move_random(self)
+	end
+end
+
+function player_move_random(self, dirx, diry)
+	dirx = dirx or 0
+	diry = diry or 0
+
+	local x = dirx
+	if x == 0 then
+		x = flr(rnd(3))-1
+	end
+
+	local y = diry
+	if y == 0 then
+		y = flr(rnd(3))-1
+	end
+
+	if y ~= 0 and x ~= 0 then
+		if (rnd(2)) == 1 then
+			y = 0
+		else
+			x = 0
+		end
+	end
+
+	-- debug("p "..tostr(self.player).." random move")
+	-- local x = flr(rnd(3))-1
+	-- local y = flr(rnd(3))-1
+	player_set_position(self, self.x+x,self.y+y)
+end
+
 function flag_create(x, y)
 	local f={}
 	anim_init(f,x,y)
@@ -479,9 +516,9 @@ function flag_create(x, y)
 	return f
 end
 
-function flag_drop(f,xcell,ycell)
-	f.xcell = xcell
-	f.ycell = ycell
+function flag_drop(f,x,y)
+	f.x = x
+	f.y = y
 	f.visible = true
 end
 
@@ -505,6 +542,8 @@ function anim_init(a,x,y)
 	a.y=y
 	a.flipx=false
 	a.flipy=false
+	a.width=8
+	a.height=8
 	a.visible=true
 	a.f=1
 	a.sp={0}
@@ -552,6 +591,12 @@ end
 function flip_player(corner)
 	if (corner == 2) or (corner == 3) then return true
 	else return false end
+end
+
+function sametile(a1,a2)
+	if (a1.x == a2.x) and (a1.y == a2.y) then return true
+	else return false
+	end
 end
 
 -- game=
