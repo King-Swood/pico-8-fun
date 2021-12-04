@@ -149,7 +149,7 @@ function game_init()
 	g.playerstats={game_stats_create(),game_stats_create()}
 	g.anims={}
 	g.framerate = 60
-	g.roundtime = 3--20 -- seconds in each round
+	g.roundtime = 15 -- seconds in each round
 	g.scoretimer = 0
 	g.roundcomplete = false
 	g.starttimer = 0
