@@ -12,23 +12,7 @@ __lua__
 --		then compare the times between the players to come up with the messages.
 
 -- todo: add sound effects
--- todo: consider pushing into the "incomplete" part of the forum.
--- todo: when the menu first displays the flag should appear on the bottom in a puff of smoke.
---			player 1 runs on, grabs, it and runs off screen
---			both players then are shown periodically chasing the other off-screen, with the player in front always holding the flag.
--- todo: centre the playing field on screen.
 -- todo: setup on raspberry pi to do some playtesting with sarah.
--- todo: fix bug where players might be able to randomly be moved to out-of-bounds.
--- todo: fix bug where a player can randomly be placed on the flag and then not pick it up.
--- todo: fix bug where a player can
---   steal the flag, but then the other player
---   somehow lands on the square of the first
---   player causing them to drop the flag again.
-
--- todo:	fix random movements.
---			they are a good idea, however they should still take into account the direction the player wishes to go.
---			so instead of moving in any direction, the random variable should hold either: any, up, down, left, or right.
---			then when we generate the random movement, if the player is randomly moving up, then y definitely decreases by 1, but x could be either -1, +1, or 0.
 
 -- enabledebug = true
 enabledebug = false
@@ -110,6 +94,12 @@ function menu_init()
 	_draw=menu_draw
 
 	menu={}
+	menu.p1=player_create(72,24,1,false,false)
+	menu.p2=player_create(24,40,2,false,false)
+	menu.p2.flipx=true
+	anim_set(menu.p2,"fallen")
+	menu.flag = flag_create(56,15)
+	menu.p2.falltimer = 0
 	menu.p1rotate=false
 	menu.p2rotate=false
 	menu.p2ai=false
@@ -121,11 +111,18 @@ end
 
 function menu_draw()
 	cls()
-	map(0,0)
-	print("manic ctf!!",22,24,9)
+	anim_draw_scale(menu.p1,3)
+	pal(p1colour,p2colour)
+	anim_draw_scale(menu.p2,3)
+	pal()
+	menu.p2.falltimer += 1
+	anim_update(menu.p2)
+	anim_update(menu.flag)
+	anim_draw_scale(menu.flag,3)
+	print("manic ctf!!",56,60,9)
 
-	print("steal the flag",32,50,10)
-	print("crush your opponent",35,64,10)
+	-- print("steal the flag",32,50,10)
+	-- print("crush your opponent",35,64,10)
 
 	print("press a or b to start!",20,100,12)
 end
@@ -420,9 +417,8 @@ function player_draw(p)
 
 	anim_draw(p)
 	if p.flag then
-	 local x = p.x*8-3
-	 if p.flipx then x = p.x*8+3 end
-	 
+		local x = p.x*8-3
+		if p.flipx then x = p.x*8+3 end
 		spr(3,
 			x,
 			p.y*8-1,
@@ -603,6 +599,14 @@ function anim_draw(a)
 	if (a.visible and not a.remove) then
 		local nx,ny=a.x*8,a.y*8
 		spr(a.sp[a.f],nx,ny,1,1,a.flipx,a.flipy)
+	end
+end
+
+function anim_draw_scale(a,scale)
+	if (a.visible and not a.remove) then
+		local sx, sy = (a.sp[a.f] % 16) * 8, flr(a.sp[a.f] \ 16) * 8
+		-- spr(a.sp[a.f],nx,ny,1,1,a.flipx,a.flipy)
+		sspr(sx,sy,8,8,a.x,a.y,8*scale,8*scale,a.flipx,a.flipy)
 	end
 end
 	
