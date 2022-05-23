@@ -120,10 +120,6 @@ function menu_draw()
 	anim_update(menu.flag)
 	anim_draw_scale(menu.flag,3)
 	print("manic ctf!!",56,60,9)
-
-	-- print("steal the flag",32,50,10)
-	-- print("crush your opponent",35,64,10)
-
 	print("press a or b to start!",20,100,12)
 end
 
