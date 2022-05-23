@@ -205,6 +205,7 @@ function game_update()
 			g.roundcomplete = true
 		else
 			foreach(g.players,player_update)
+			players_check_collisions()
 			for i=1,#g.playerstats do
 				game_stats_update(g.playerstats[i], g.players[i])
 			end
@@ -401,16 +402,16 @@ function player_update_human(self)
 	local down = (self.rotate == false) and 3 or 1
 
 	if (btnp(left,self.player-1)) then
-		player_set_position(self, self.x-1,self.y)
+		player_walk(self,-1,0)
 	end
 	if (btnp(right,self.player-1)) then
-		player_set_position(self, self.x+1,self.y)
+		player_walk(self,1,0)
 	end
 	if (btnp(up,self.player-1)) then
-		player_set_position(self, self.x,self.y-1)
+		player_walk(self,0,-1)
 	end
 	if (btnp(down,self.player-1)) then
-		player_set_position(self, self.x,self.y+1)
+		player_walk(self,0,1)
 	end
 end
 
@@ -419,8 +420,8 @@ function player_draw(p)
 
 	anim_draw(p)
 	if p.flag then
-	 local x = p.x*8-2
-	 if p.flipx then x = p.x*8+2 end
+	 local x = p.x*8-3
+	 if p.flipx then x = p.x*8+3 end
 	 
 		spr(3,
 			x,
@@ -432,11 +433,52 @@ function player_draw(p)
 	pal()
 end
 
-function player_set_position(self,x,y)
+function players_check_collisions()
 	local game=g --uses global variable
-	if (not fget(mget(x,y-1),0)) then
-		self.x = x
-		self.y = y
+	foreach(game.players,
+		function(p)
+			foreach(game.players,
+				function(pn)
+					if ((p ~= pn) and sametile(p,pn)) then
+						if p.flag or pn.flag then
+							p.flag = pn.flag
+							pn.flag = not p.flag
+
+							if (not p.flag) then
+								player_fall_random(p)
+								debug("player "..tostr(p.player).." lost the flag")
+							else
+								player_fall_random(pn)
+								debug("player "..tostr(pn.player).." lost the flag")
+							end
+						else
+							player_fall_random(p)
+							player_fall_random(pn)
+							debug("players bumped into each other")
+						end
+
+						while sametile(p, pn) do
+							player_move_random(pn)
+						end
+					end
+				end
+			)
+
+			if (game.flag.visible) then
+				if (sametile(p, game.flag)) then
+					game.flag.visible = false
+					p.flag = true
+				end
+			end
+		end
+	)
+end
+
+function player_walk(self,x,y)
+	local game=g --uses global variable
+	if (not fget(mget(self.x+x,self.y+y-1),0)) then
+		self.x = self.x+x
+		self.y = self.y+y
 
 		if (self.xlast ~= self.x) or (self.ylast ~= self.y) then
 			if self.curanim == "initial" then
@@ -444,44 +486,27 @@ function player_set_position(self,x,y)
 			elseif self.curanim == "walk" then
 				anim_set(self,"initial")
 			end
-
-			foreach(game.players,
-				function(p)
-					if (p != self) then
-						if (sametile(self, p)) then
-							player_fall_random(p)
-
-							if self.flag then
-								self.flag = false
-								flag_drop(game.flag,self.x, self.y)
-								player_fall_random(self)
-								debug("player "..tostr(self.player).." dropped the flag")
-							elseif p.flag then
-								p.flag = false
-								self.flag = true
-								debug("player "..tostr(self.player).." stole the flag")
-							else
-								player_fall_random(self)
-							end
-
-							while sametile(self, p) do
-								player_move_random(p)
-							end
-						end
-					end
-				end
-			)
 		end
-
 		self.xlast = self.x
 		self.ylast = self.y
 	end
+end
 
-	if (game.flag.visible) then
-		if (sametile(self, game.flag)) then
-			game.flag.visible = false
-			self.flag = true
-		end
+function player_set_position(self,x,y)
+	local game=g --uses global variable
+	if (not fget(mget(x,y-1),0)) then
+		self.x = x
+		self.y = y
+
+		-- if (self.xlast ~= self.x) or (self.ylast ~= self.y) then
+		-- 	if self.curanim == "initial" then
+		-- 		anim_set(self,"walk")
+		-- 	elseif self.curanim == "walk" then
+		-- 		anim_set(self,"initial")
+		-- 	end
+		-- end
+		self.xlast = self.x
+		self.ylast = self.y
 	end
 end
 
