@@ -181,7 +181,9 @@ function game_update()
 				menu_init()
 			end
 		else
-			game_round_init(g)
+			if skipscreen() then
+				game_round_init(g)
+			end
 		end
 	else
 		if g.starttimer > 0 then
@@ -244,10 +246,13 @@ function game_draw_player_won(self)
 			if game_has_finished(self) then
 				print("player " ..(i).. " won the game!!",14,61,1)
 				if g.scoretimer==0 then
-					print("press any key to finish",20,100,12)
+					print("press any key to finish",14,100,12)
 				end
 			else
 				print("player " ..(i).. " won the round!!",14,61,1)
+				if g.scoretimer==0 then
+					print("press any key to continue",11,100,12)
+				end
 			end
 		end
 	end
