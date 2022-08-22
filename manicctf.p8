@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 36
 __lua__
--- manic ctf 1.0
+-- manic ctf 1.1
 -- by king_swood
 
 -- todo: add a final winners screen which displays who won, and the state of their win calculated from the difference in times across the rounds.
@@ -409,16 +409,18 @@ function player_update_human(self)
 	local up = (self.rotate == false) and 2 or 0
 	local down = (self.rotate == false) and 3 or 1
 
-	if (btnp(left,self.player-1)) then
+	local btn_index = (self.player == 1) and 1 or 0
+
+	if (btnp(left,btn_index)) then
 		player_walk(self,-1,0)
 	end
-	if (btnp(right,self.player-1)) then
+	if (btnp(right,btn_index)) then
 		player_walk(self,1,0)
 	end
-	if (btnp(up,self.player-1)) then
+	if (btnp(up,btn_index)) then
 		player_walk(self,0,-1)
 	end
-	if (btnp(down,self.player-1)) then
+	if (btnp(down,btn_index)) then
 		player_walk(self,0,1)
 	end
 end
