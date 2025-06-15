@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 42
 __lua__
---player
+--engine
 p1={}
 
 --globals
@@ -43,7 +43,7 @@ function _draw()
  map()
  actor_draw(p1)
  foreach(enemies, actor_draw)
- foreach(keys, key_draw)
+ foreach(keys, actor_draw)
  	
  if p1.isdead then
   print("game over",c.x+50,c.y+60,8)
@@ -363,22 +363,20 @@ function actor_anim(a)
 end
 
 function actor_draw(a)
- spr(a.spr_table[a.spr_index],a.x,a.y,1,1,a.spr_reverse)
+ if a.is_shown then
+  spr(a.spr_table[a.spr_index],a.x,a.y,1,1,a.spr_reverse)
+ end
 end
 
 function key_check_collision(key,p)
  if items_colliding(key,p) then
-  key.is_held=true
+  key.is_shown=false
   fset(key.door_spr,0,false)
  end
 end
 
-function key_draw(key)
- if not key.is_held then
-  spr(key.spr,key.x,key.y)
- end
-end
 -->8
+--special
 function build_dynamic_items()
  for mapx=0,127 do
 	 for mapy=0,32 do
@@ -405,77 +403,58 @@ function build_dynamic_items()
  end
 end
 
-function make_player(mapx,mapy)
+function make_actor(mapx,mapy)
 	return {
-	 --position
 	 x=mapx*8,    
 	 y=mapy*8,
-	 --velocity
 	 dx=0,
 	 dy=0,
-	 
-	 spr_stand={1},
-	 spr_walk={16,17},
-	 spr_jump={1},
-	 spr_dead={32},
-	 
+	 is_shown=true,
 	 spr_index=1,
-	 spr_table={}, -- must be set before drawing
-	 spr_time=0,
-	 spr_time_max=4,
-	 spr_reverse=false,
-	   
-	 --is the player standing on
-	 --the ground. used to determine
-	 --if they can jump.
-	 isgrounded=false,
-	 isgrounded_last=true,
-	
-	 --tuning constants
-	
-	 jumpvel=3.1,
-	 jumpframe=0,
-	 jumppressed=false,
-	 isdead=false,
-	 
-	 flowers_found=0
-	}
-end
-
-function make_enemy_default(mapx,mapy)
-	return {
-	 x=mapx*8,    
-	 y=mapy*8,
-	 dx=-1,
-	 dy=0,
-	 spr_index=1,
-	 spr_table={0},
+	 spr_table={},-- must be set before drawing
 	 spr_time=0,
 	 spr_time_max=4,
 	 spr_reverse=true,
+  -- used to detect if the player can jump
+  isgrounded=false,
+  isgrounded_last=true,
 	}
 end
 
+function make_player(mapx,mapy)
+ a = make_actor(mapx,mapy)
+ a.spr_stand={1}
+ a.spr_walk={16,17}
+ a.spr_jump={1}
+ a.spr_dead={32}
+ a.spr_table=a.spr_stand
+	a.jumpvel=3.1
+	a.jumpframe=0
+	a.jumppressed=false
+	a.isdead=false
+	a.flowers_found=0
+	return a
+end
+
 function make_enemy1(mapx,mapy)
- e = make_enemy_default(mapx,mapy)
+ e = make_actor(mapx,mapy)
  e.spr_table={4}
+ e.dx=-1
  return e
 end
 
 function make_enemy2(mapx,mapy)
- e = make_enemy_default(mapx,mapy)
+ e = make_actor(mapx,mapy)
  e.spr_table={7,8}
+ e.dx=-1
  return e
 end
 
 function make_key(mapx,mapy,keyspr,doorspr)
-	return {
-		x=mapx*8,
-		y=mapy*8,
-		spr=keyspr,
-		door_spr=doorspr,
-		is_held=false,
-	}
+ a = make_actor(mapx,mapy)
+ a.spr_table={keyspr}
+ a.door_spr=doorspr
+	return a
 end
 __gfx__
 0000000000888880440444cc0000000000ceec00009900000999999000ccccc00ccccc0000bb00000bbbbbb00000000000000000000000000000000066566666
