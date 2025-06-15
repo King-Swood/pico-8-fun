@@ -56,7 +56,7 @@ end
 function range_overlaps(a1,a2,b1,b2)
  if a1>=b1 and a1<b2 then
   return true
- elseif a2>=b1 and a2<b2 then
+ elseif a2>b1 and a2<(b2-1) then
   return true
  end
  return false
@@ -232,26 +232,8 @@ function player_update(p)
   p1.isgrounded_last=p1.isgrounded
 end
 
---box to box intersection
-function intersects_box_box(
-	x1,y1,
-	w1,h1,
-	x2,y2,
-	w2,h2)
-
-	local xd=x1-x2
-	local xs=w1*0.5+w2*0.5
-	if abs(xd)>=xs then return false end
-
-	local yd=y1-y2
-	local ys=h1*0.5+h2*0.5
-	if abs(yd)>=ys then return false end
-	
-	return true
-end
-
 function check_enemy_collision(e)
- if intersects_box_box(p1.x,p1.y,8,8,e.x,e.y,8,8) then
+ if items_colliding(p1,e) then
    p1.isdead=true
  end
 end
