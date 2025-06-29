@@ -15,7 +15,9 @@ g=
  -- as the first block on the next screen.
  camshft=120,
  max_flowers=0,
- finished=false
+ starting=true,
+ finished=false,
+ start_counter=90,
 }
 
 --camera
@@ -30,9 +32,16 @@ enemies={}
 
 function _init()
  build_dynamic_items()
+ set_camera(p1)
 end
 
 function _update()
+ if g.starting then
+  if g.start_counter>1then g.start_counter-=1
+  else
+   g.starting=false
+  end
+ end
  player_update(p1)
  foreach(enemies, enemy_update)
 end
@@ -47,6 +56,9 @@ function _draw()
  	
  if p1.isdead then
   print("game over",c.x+50,c.y+60,8)
+ end
+ if g.starting then
+  print(flr(g.start_counter/30)+1,c.x+60,c.y+60,12)
  end
  if g.finished then
   print("done game",c.x+50,c.y+60,12)
@@ -123,9 +135,18 @@ function player_anim(p)
  actor_anim(p)
 end
 
+function set_camera(p)
+  -- move the camera to another screen if necessary
+  if p.y>=(c.y+g.camshft) then c.y+=g.camshft end
+  if p.y<(c.y) then c.y-=g.camshft end
+  if p.x>=(c.x+g.camshft) then c.x+=g.camshft end
+  if p.x<(c.x) then c.x-=g.camshft end
+end
+
 function player_update(p)
 
  if p.isdead then return end
+ if g.starting then return end
  if g.finished then return end
  
  --remember where we started
@@ -220,12 +241,8 @@ function player_update(p)
   check_flower_collision()
    
   foreach(enemies, check_enemy_collision)
-    
-  -- move the camera to another screen if necessary
-  if p1.y>=(c.y+g.camshft) then c.y+=g.camshft end
-  if p1.y<(c.y) then c.y-=g.camshft end
-  if p1.x>=(c.x+g.camshft) then c.x+=g.camshft end
-  if p1.x<(c.x) then c.x-=g.camshft end
+  
+  set_camera(p1)
   
   for i=1,#keys do key_check_collision(keys[i],p1) end
   player_anim(p1)
