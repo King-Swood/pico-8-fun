@@ -2,26 +2,29 @@ pico-8 cartridge // http://www.pico-8.com
 version 42
 __lua__
 function _init()
- car=car_make(16,12)
+ car1=car_make(16,10,0)
+ car2=car_make(16,18,1)
 end
 
 function _update()
-	car_update(car)
+	car_update(car1)
+	car_update(car2)
 end
 
 function _draw()
  cls()
  camera_draw()
  map_draw()
- car_draw(car)
+ car_draw(car1)
+ car_draw(car2)
 end
 -->8
-function car_make(x,y)
+function car_make(x,y,p)
  local a={}
+ a.p=p
  a.x=x
  a.y=y
- a.mx=0
- a.my=0
+ a.m=0
  a.slow=false
  a.a=90
  
@@ -32,30 +35,29 @@ function car_update(a)
  local m_max=1
  local m_inc=0.2
  local m_dec=0.1
+ local r_inc=5
  
- if (btn(0)) then
-  a.mx-=m_inc
+ if (btn(0,a.p)) then
+  a.a-=r_inc
  end
- if (btn(1)) then
-  a.mx+=m_inc
+ if (btn(1,a.p)) then
+  a.a+=r_inc
  end
- if (btn(2)) then
-  a.my-=m_inc
+ if (btn(2,a.p)) then
+  a.m+=m_inc
  end
- if (btn(3)) then
-  a.my+=m_inc
- end
- 
- if a.mx>m_max then a.mx=m_max
- elseif a.mx<-m_max then a.mx=-m_max
+ if (btn(3,a.p)) then
+  a.m-=m_inc
  end
  
- if a.my>m_max then a.my=m_max
- elseif a.my<-m_max then a.my=-m_max
+ if a.m>m_max then a.m=m_max
+ elseif a.m<-m_max then a.m=-m_max
  end
  
- a.x+=a.mx
- a.y+=a.my
+ -- todo: need to use angle to work out the proportion
+ --  of momentum to apply to x and y.
+ a.x+=a.m
+ a.y+=a.m
  
  a.slow=false
  if (tile_flag_at(a.x,a.y) & 1) == 0 then a.slow=true end
@@ -65,14 +67,9 @@ function car_update(a)
   
  if a.slow then m_dec=m_dec*3 end
  
- if a.mx>m_dec then a.mx-=m_dec
- elseif a.mx<-m_dec then a.mx+=m_dec
- else a.mx=0
- end
- 
- if a.my>m_dec then a.my-=m_dec
- elseif a.my<-m_dec then a.my+=m_dec
- else a.my=0
+ if a.m>m_dec then a.m-=m_dec
+ elseif a.m<-m_dec then a.m+=m_dec
+ else a.m=0
  end
 end
 
@@ -85,7 +82,7 @@ function map_draw()
 end
 
 function camera_draw()
- camera(car.x-64,car.y-64)
+ camera(car1.x-64,car1.y-64)
 end
 
 function tile_at(x,y)
