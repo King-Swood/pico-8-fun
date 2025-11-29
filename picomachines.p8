@@ -31,6 +31,25 @@ function car_make(x,y,p)
  return a
 end
 
+function mx_from_ma(m,a)
+ local mult=1
+ if a>180 then
+  mult=-1
+  a-=180
+ end
+ 
+ local mx=0
+ if a<=90 then mx=m*(a/90)
+ else mx=m*(1-((a-90)/90))
+ end
+ 
+ return mx*mult
+end
+
+function my_from_ma(m,a)
+ return mx_from_ma(m,a-90)
+end
+
 function car_update(a)
  local m_max=1
  local m_inc=0.2
@@ -50,14 +69,14 @@ function car_update(a)
   a.m-=m_inc
  end
  
+ a.a=a.a%360
+ 
  if a.m>m_max then a.m=m_max
  elseif a.m<-m_max then a.m=-m_max
  end
  
- -- todo: need to use angle to work out the proportion
- --  of momentum to apply to x and y.
- a.x+=a.m
- a.y+=a.m
+ a.x+=mx_from_ma(a.m,a.a)
+ a.y+=my_from_ma(a.m,a.a)
  
  a.slow=false
  if (tile_flag_at(a.x,a.y) & 1) == 0 then a.slow=true end
