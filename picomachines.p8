@@ -100,7 +100,7 @@ function car_update(a)
 end
 
 function car_draw(a)
-    if a.a >= 350 and a.a <= 10 then
+    if a.a >= 350 or a.a <= 10 then
         spr(48, a.x, a.y)
     elseif a.a >= 80 and a.a <= 100 then
         spr(49, a.x, a.y)
